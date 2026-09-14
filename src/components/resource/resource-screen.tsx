@@ -56,14 +56,19 @@ export function ResourceScreen<T extends { id: string }>({
 
   const columns = useMemo<Column<T>[]>(() => {
     const base = [...def.columns]
-    if (canUpdate || canDelete) {
+    if (canUpdate || canDelete || def.rowActions) {
       base.push({
         key: '__actions',
         header: '',
         align: 'right',
-        className: 'w-24',
+        className: def.rowActions ? 'w-44' : 'w-24',
         cell: (row) => (
-          <div className="flex justify-end gap-1">
+          <div
+            className="flex items-center justify-end gap-1"
+            // The row itself may navigate; the controls in it must not.
+            onClick={(event) => event.stopPropagation()}
+          >
+            {def.rowActions?.(row)}
             {canUpdate && (
               <button
                 type="button"

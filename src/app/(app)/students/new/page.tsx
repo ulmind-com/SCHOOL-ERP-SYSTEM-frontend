@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useMutation } from '@tanstack/react-query'
-import { ArrowLeft, UserPlus } from 'lucide-react'
+import { ArrowLeft, MailCheck, UserPlus } from 'lucide-react'
 import Link from 'next/link'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
@@ -24,11 +24,16 @@ export default function NewStudentPage() {
   const { data: sections } = useOptions('/sections', { class_id: classId || undefined })
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
 
+  const [result, setResult] = useState<any>(null)
+
   const mutation = useMutation({
     mutationFn: (body: unknown) => api.post<any>('/students/with-guardians', body),
-    onSuccess: (result) => {
-      toast.success(`Admitted — ${result.admission_number}`)
-      router.push(`/students/${result.id}`)
+    onSuccess: (outcome) => {
+      toast.success(`Admitted — ${outcome.admission_number}`)
+      // Not straight to the profile: when no mail provider is configured the
+      // temporary passwords come back here and nowhere else.
+      if (outcome.logins?.length || outcome.skipped?.length) setResult(outcome)
+      else router.push(`/students/${outcome.id}`)
     },
     onError: (error) => {
       if (error instanceof ApiError) {
@@ -97,6 +102,81 @@ export default function NewStudentPage() {
       create_login: form.get('create_login') === 'on',
       create_guardian_login: form.get('create_guardian_login') === 'on',
     })
+  }
+
+  if (result) {
+    return (
+      <Page
+        title="Student admitted"
+        subtitle={result.admission_number}
+        actions={
+          <Link href={`/students/${result.id}`}>
+            <Button>Open the record</Button>
+          </Link>
+        }
+      >
+        <Card>
+          <CardHeader title="Sign-in details" subtitle={result.detail} />
+          <CardBody className="space-y-3 pt-2">
+            {result.logins?.map((login: any) => (
+              <div
+                key={login.email}
+                className="flex flex-wrap items-center gap-3 rounded-field bg-surface-sunken px-3.5 py-3"
+              >
+                <span className="min-w-0 flex-1">
+                  <span className="block text-[13.5px] font-bold text-ink">{login.email}</span>
+                  <span className="block text-[12.5px] text-muted">
+                    {login.for === 'parent' ? 'Parent login' : 'Student login'}
+                  </span>
+                </span>
+                {login.temporary_password ? (
+                  <code className="tabular rounded-field bg-surface px-3 py-1.5 text-[14px] font-bold text-ink">
+                    {login.temporary_password}
+                  </code>
+                ) : (
+                  <span className="flex items-center gap-1.5 text-[12.5px] font-semibold text-success">
+                    <MailCheck className="h-3.5 w-3.5" aria-hidden />
+                    Emailed
+                  </span>
+                )}
+              </div>
+            ))}
+
+            {result.skipped?.map((note: string) => (
+              <p
+                key={note}
+                className="rounded-field bg-warning/10 px-3.5 py-2.5 text-[12.5px] font-medium text-warning"
+              >
+                {note}
+              </p>
+            ))}
+
+            {result.email_configured === false && (
+              <p className="text-[12.5px] text-muted">
+                No email provider is configured, so nothing was sent. Pass these on yourself,
+                or add one and use the Resend login button on their record.
+              </p>
+            )}
+          </CardBody>
+        </Card>
+
+        <div className="flex flex-wrap gap-3">
+          <Link href={`/students/${result.id}`}>
+            <Button size="lg">Open the record</Button>
+          </Link>
+          <Button
+            variant="secondary"
+            size="lg"
+            onClick={() => {
+              setResult(null)
+              setFieldErrors({})
+            }}
+          >
+            Admit another
+          </Button>
+        </div>
+      </Page>
+    )
   }
 
   return (
@@ -215,8 +295,18 @@ export default function NewStudentPage() {
         <Card>
           <CardHeader title="Portal access" subtitle="Invitations go to the email addresses above" />
           <CardBody className="space-y-3 pt-2">
-            <Checkbox name="create_login" label="Create a student login" />
-            <Checkbox name="create_guardian_login" label="Create a parent login" />
+            <Checkbox
+              name="create_login"
+              label="Create a student login"
+              defaultChecked
+              hint="A password is emailed to the student's address above."
+            />
+            <Checkbox
+              name="create_guardian_login"
+              label="Create a parent login"
+              defaultChecked
+              hint="A password is emailed to the guardian's address above."
+            />
             <Textarea name="notes" label="Internal notes" placeholder="Anything the office should know" />
           </CardBody>
         </Card>
@@ -237,15 +327,29 @@ export default function NewStudentPage() {
   )
 }
 
-function Checkbox({ name, label }: { name: string; label: string }) {
+function Checkbox({
+  name,
+  label,
+  hint,
+  defaultChecked,
+}: {
+  name: string
+  label: string
+  hint?: string
+  defaultChecked?: boolean
+}) {
   return (
-    <label className="flex cursor-pointer items-center gap-2.5 text-[13.5px] font-semibold text-ink-soft">
+    <label className="flex cursor-pointer items-start gap-2.5 text-[13.5px] font-semibold text-ink-soft">
       <input
         type="checkbox"
         name={name}
-        className="h-4 w-4 rounded border-line text-ink accent-[rgb(17_18_20)]"
+        defaultChecked={defaultChecked}
+        className="mt-0.5 h-4 w-4 rounded border-line text-ink accent-[rgb(17_18_20)]"
       />
-      {label}
+      <span>
+        {label}
+        {hint && <span className="mt-0.5 block text-[12.5px] font-normal text-muted">{hint}</span>}
+      </span>
     </label>
   )
 }

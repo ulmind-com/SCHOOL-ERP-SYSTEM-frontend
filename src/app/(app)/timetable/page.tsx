@@ -41,11 +41,30 @@ export default function TimetablePage() {
   const [sectionId, setSectionId] = useState('')
   const [adding, setAdding] = useState<{ day: number; periodId: string } | null>(null)
 
-  const { data: classes } = useOptions('/classes')
-  const { data: sections } = useOptions('/sections', { class_id: classId || undefined })
+  // A student holds timetable:read for their own week but nothing that would
+  // let them list classes, sections or staff. Asking anyway put a wall of 403s
+  // in the log and left them looking at empty pickers they cannot use.
+  const canPick = can('classes:read')
+  const canEdit = can('timetable:update')
+
+  const { data: classes } = useOptions(canPick ? '/classes' : '')
+  const { data: sections } = useOptions(canPick ? '/sections' : '', {
+    class_id: classId || undefined,
+  })
   const { data: periods } = useOptions('/periods')
   const { data: subjects } = useOptions('/subjects', { class_id: classId || undefined })
-  const { data: staff } = useOptions('/staff', { status: 'active' })
+  const { data: staff } = useOptions(canEdit ? '/staff' : '', { status: 'active' })
+
+  // Without a class picker the section has to come from who is signed in.
+  const mySection = useQuery({
+    queryKey: ['my-section'],
+    enabled: !canPick,
+    queryFn: () => api.get<any>('/portal/me'),
+  })
+  useEffect(() => {
+    const first = mySection.data?.students?.[0]
+    if (!canPick && first?.section?.id) setSectionId(first.section.id)
+  }, [canPick, mySection.data])
 
   useEffect(() => {
     if (!classId && classes?.length) setClassId(classes[0].id)
@@ -101,37 +120,41 @@ export default function TimetablePage() {
 
   return (
     <Page
-      title="Timetable"
-      subtitle="Weekly schedule per section"
+      title={canPick ? 'Timetable' : 'My Timetable'}
+      subtitle={canPick ? 'Weekly schedule per section' : 'Your week'}
       actions={
         <div className="flex flex-wrap gap-2">
-          {can('timetable:update') && <BellScheduleButton periods={periods ?? []} />}
-          <Select
-            aria-label="Class"
-            value={classId}
-            onChange={(event) => setClassId(event.target.value)}
-            containerClassName="w-auto"
-            className="min-w-[140px] rounded-pill border-transparent bg-surface shadow-card"
-          >
-            {(classes ?? []).map((option: any) => (
-              <option key={option.id} value={option.id}>
-                {option.name}
-              </option>
-            ))}
-          </Select>
-          <Select
-            aria-label="Section"
-            value={sectionId}
-            onChange={(event) => setSectionId(event.target.value)}
-            containerClassName="w-auto"
-            className="min-w-[130px] rounded-pill border-transparent bg-surface shadow-card"
-          >
-            {(sections ?? []).map((option: any) => (
-              <option key={option.id} value={option.id}>
-                Section {option.name}
-              </option>
-            ))}
-          </Select>
+          {canEdit && <BellScheduleButton periods={periods ?? []} />}
+          {canPick && (
+            <>
+              <Select
+                aria-label="Class"
+                value={classId}
+                onChange={(event) => setClassId(event.target.value)}
+                containerClassName="w-auto"
+                className="min-w-[140px] rounded-pill border-transparent bg-surface shadow-card"
+              >
+                {(classes ?? []).map((option: any) => (
+                  <option key={option.id} value={option.id}>
+                    {option.name}
+                  </option>
+                ))}
+              </Select>
+              <Select
+                aria-label="Section"
+                value={sectionId}
+                onChange={(event) => setSectionId(event.target.value)}
+                containerClassName="w-auto"
+                className="min-w-[130px] rounded-pill border-transparent bg-surface shadow-card"
+              >
+                {(sections ?? []).map((option: any) => (
+                  <option key={option.id} value={option.id}>
+                    Section {option.name}
+                  </option>
+                ))}
+              </Select>
+            </>
+          )}
         </div>
       }
     >
@@ -146,7 +169,15 @@ export default function TimetablePage() {
             }
           />
         ) : !sectionId ? (
-          <EmptyState icon="layers" title="Create a section first" />
+          <EmptyState
+            icon="layers"
+            title={canPick ? 'Create a section first' : 'You are not in a section yet'}
+            description={
+              canPick
+                ? undefined
+                : 'Ask the school office to place you in a class section.'
+            }
+          />
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full min-w-[820px] border-separate border-spacing-1.5">

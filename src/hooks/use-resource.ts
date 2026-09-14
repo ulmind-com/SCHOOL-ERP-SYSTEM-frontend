@@ -133,6 +133,10 @@ export function useOptions<T = any>(path: string, query: Record<string, any> = {
   return useQuery({
     queryKey: ['options', path, query],
     staleTime: 5 * 60_000,
+    // A filter with a static option list has no path to fetch. Without this the
+    // dropdown still fired a request, and every such screen sat on a 404 for
+    // `/api/v1` that looked like a real fault in the log.
+    enabled: Boolean(path),
     queryFn: async () => {
       const result = await api.get<Paged<T>>(path, { page_size: 200, ...query })
       return result.items

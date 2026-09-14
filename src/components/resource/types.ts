@@ -51,4 +51,6 @@ export interface ResourceDef<T = any> {
   emptyDescription?: string
   invalidates?: string[]
   onRowClick?: (row: T) => void
+  /** Extra controls in the actions column, before edit and delete. */
+  rowActions?: (row: T) => React.ReactNode
 }

@@ -18,6 +18,7 @@ import {
   User,
 } from 'lucide-react'
 import { toast } from 'sonner'
+import { SendCredentials } from '@/components/people/send-credentials'
 import { AttendanceCalendar } from '@/components/students/attendance-calendar'
 import { Avatar } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
@@ -120,6 +121,14 @@ export default function StudentProfilePage({
               Report card
             </Button>
           ) : null}
+          {can('users:update') && (
+            <SendCredentials
+              personType="student"
+              personId={id}
+              name={data.full_name}
+              hasLogin={Boolean(data.login)}
+            />
+          )}
           {/* The quickest answer to "the app is not showing my marks" is to
               stand where they are standing. */}
           {can('users:update') && data.login && (

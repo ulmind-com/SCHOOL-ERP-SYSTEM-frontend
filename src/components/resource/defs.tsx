@@ -3,6 +3,7 @@
 import { format, parseISO } from 'date-fns'
 import { Avatar } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
+import { SendCredentials } from '@/components/people/send-credentials'
 import { money, subjectLabel, titleCase } from '@/lib/utils'
 import type { ResourceDef } from './types'
 
@@ -300,6 +301,9 @@ export const PROGRAMS: ResourceDef = {
 
 /* ── People ────────────────────────────────────────────────────────────── */
 export const STAFF: ResourceDef = {
+  rowActions: (row: any) => (
+    <SendCredentials personType="staff" personId={row.id} name={row.full_name} hasLogin={Boolean(row.user_id)} size="sm" />
+  ),
   path: '/staff',
   module: 'staff',
   title: 'Staff & Teachers',
@@ -401,6 +405,9 @@ export const STAFF: ResourceDef = {
 }
 
 export const GUARDIANS: ResourceDef = {
+  rowActions: (row: any) => (
+    <SendCredentials personType="guardian" personId={row.id} name={row.full_name} hasLogin={Boolean(row.user_id)} size="sm" />
+  ),
   path: '/guardians',
   module: 'guardians',
   title: 'Parents & Guardians',
