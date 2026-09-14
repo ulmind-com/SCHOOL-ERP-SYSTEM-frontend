@@ -2,10 +2,12 @@
 
 import { use, useRef, useState } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { format, parseISO } from 'date-fns'
 import {
   CalendarCheck,
+  Eye,
   FileText,
   IdCard,
   Mail,
@@ -61,6 +63,17 @@ export default function StudentProfilePage({
     queryFn: () => api.get<any>(`/students/${id}/profile`),
   })
 
+  const router = useRouter()
+  const viewAs = useMutation({
+    mutationFn: (userId: string) => useSession.getState().viewAs(userId),
+    onSuccess: () => {
+      toast.success('You are now viewing the app as this student')
+      router.push('/portal/me')
+    },
+    onError: (error) =>
+      toast.error(error instanceof ApiError ? error.message : 'Could not open that account'),
+  })
+
   const { data: ledger } = useQuery({
     queryKey: ['student-ledger', id],
     enabled: tab === 'Fees' && can('invoices:read'),
@@ -107,6 +120,18 @@ export default function StudentProfilePage({
               Report card
             </Button>
           ) : null}
+          {/* The quickest answer to "the app is not showing my marks" is to
+              stand where they are standing. */}
+          {can('users:update') && data.login && (
+            <Button
+              variant="secondary"
+              loading={viewAs.isPending}
+              onClick={() => viewAs.mutate(data.login.id)}
+            >
+              <Eye className="h-4 w-4" aria-hidden />
+              Open their portal
+            </Button>
+          )}
           {can('students:update') && (
             <Link href={`/students/${id}/edit`}>
               <Button variant="secondary">Edit</Button>

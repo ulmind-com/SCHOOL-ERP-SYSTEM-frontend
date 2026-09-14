@@ -1,6 +1,6 @@
 'use client'
 
-import { LottieLight } from 'lottie-react'
+import { LottieSvg } from 'lottie-react'
 import animation from '@/assets/Books.json'
 
 /**
@@ -8,13 +8,15 @@ import animation from '@/assets/Books.json'
  * their own chunk. Neither belongs in the bundle that has to arrive before the
  * app can paint — a loader that makes the wait longer is not a loader.
  *
- * `LottieLight` rather than the full build: the animation is plain shape layers
- * with no expressions and nothing three-dimensional, so the larger engines have
- * nothing to add.
+ * `LottieSvg` rather than the full build: the animation is plain shape layers,
+ * so the canvas and HTML renderers have nothing to add. Not `LottieLight`,
+ * which is smaller again but throws "n is not a constructor" once minified —
+ * it works in development and fails in production, which is the worst way for
+ * a loader to fail.
  */
 export default function LottiePlayer({ size }: { size: number }) {
   return (
-    <LottieLight
+    <LottieSvg
       src={animation}
       loop
       autoplay
