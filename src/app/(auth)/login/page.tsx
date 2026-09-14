@@ -131,13 +131,12 @@ function LoginScreen() {
 
       <form onSubmit={submit} className="mt-7 space-y-4">
         <Input
-          label="Email address"
-          type="email"
+          label="Email or phone"
           autoComplete="username"
           required
           value={email}
           onChange={(event) => setEmail(event.target.value)}
-          placeholder="you@institution.edu"
+          placeholder="you@institution.edu or 98765 43210"
           leading={<Mail className="h-4 w-4" aria-hidden />}
         />
         <Input

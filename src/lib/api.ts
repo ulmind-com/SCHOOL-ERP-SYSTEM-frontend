@@ -8,6 +8,7 @@ const PREFIX = '/api/v1'
 const ACCESS_KEY = 'scholarly.access'
 const REFRESH_KEY = 'scholarly.refresh'
 const TENANT_KEY = 'scholarly.tenant'
+const IMPERSONATION_KEY = 'scholarly.impersonating'
 
 export class ApiError extends Error {
   status: number
@@ -47,6 +48,50 @@ export const tokens = {
     localStorage.removeItem(ACCESS_KEY)
     localStorage.removeItem(REFRESH_KEY)
     localStorage.removeItem(TENANT_KEY)
+    localStorage.removeItem(IMPERSONATION_KEY)
+  },
+
+  /**
+   * Step into another account, keeping the real session parked.
+   *
+   * The impersonation token deliberately comes without a refresh token, so the
+   * borrowed session simply expires rather than renewing itself for a month.
+   * The administrator's own pair waits in storage until they step back out.
+   */
+  beginImpersonation(accessToken: string, who: { id: string; name: string; email: string }) {
+    const parked = {
+      access: localStorage.getItem(ACCESS_KEY),
+      refresh: localStorage.getItem(REFRESH_KEY),
+      viewing: who,
+    }
+    localStorage.setItem(IMPERSONATION_KEY, JSON.stringify(parked))
+    localStorage.setItem(ACCESS_KEY, accessToken)
+    localStorage.removeItem(REFRESH_KEY)
+  },
+
+  impersonation(): { viewing: { id: string; name: string; email: string } } | null {
+    if (typeof window === 'undefined') return null
+    try {
+      const raw = localStorage.getItem(IMPERSONATION_KEY)
+      return raw ? JSON.parse(raw) : null
+    } catch {
+      return null
+    }
+  },
+
+  endImpersonation(): boolean {
+    const raw = localStorage.getItem(IMPERSONATION_KEY)
+    if (!raw) return false
+    try {
+      const parked = JSON.parse(raw)
+      if (parked.access) localStorage.setItem(ACCESS_KEY, parked.access)
+      if (parked.refresh) localStorage.setItem(REFRESH_KEY, parked.refresh)
+    } catch {
+      return false
+    } finally {
+      localStorage.removeItem(IMPERSONATION_KEY)
+    }
+    return true
   },
 }
 

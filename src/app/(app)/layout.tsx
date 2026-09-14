@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { usePathname, useRouter } from 'next/navigation'
+import { ImpersonationBanner } from '@/components/layout/impersonation-banner'
 import { MenuProvider } from '@/components/layout/menu-context'
 import { Sidebar } from '@/components/layout/sidebar'
 import { useSession } from '@/lib/session'
@@ -50,6 +51,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         )}
 
         <main className="min-w-0 flex-1 pb-10">
+          <ImpersonationBanner />
           <MenuProvider value={() => setNavOpen(true)}>{children}</MenuProvider>
         </main>
       </div>

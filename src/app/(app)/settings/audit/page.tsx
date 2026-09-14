@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { format, parseISO } from 'date-fns'
+import { ChevronDown } from 'lucide-react'
 import { Avatar } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
 import { Card } from '@/components/ui/card'
@@ -12,7 +13,7 @@ import { Input, Select } from '@/components/ui/input'
 import { Page } from '@/components/layout/page'
 import { Pagination } from '@/components/ui/pagination'
 import { api } from '@/lib/api'
-import { titleCase } from '@/lib/utils'
+import { cn, titleCase } from '@/lib/utils'
 
 const ENTITIES = [
   'students', 'staff', 'attendance', 'invoices', 'payments', 'users', 'roles',
@@ -82,9 +83,19 @@ export default function AuditPage() {
               cell: (row: any) => (
                 <div className="flex items-center gap-2.5">
                   <Avatar name={row.actor_name || 'System'} size={28} />
-                  <span className="truncate text-[13.5px] font-semibold text-ink">
-                    {row.actor_name || 'System'}
-                  </span>
+                  <div className="min-w-0">
+                    <p className="truncate text-[13.5px] font-semibold text-ink">
+                      {row.actor_name || 'System'}
+                    </p>
+                    {/* An impersonated session writes under the borrowed
+                        account, so the real hand has to be named here or the
+                        trail reads as if the student did it themselves. */}
+                    {row.on_behalf_of_name && (
+                      <p className="truncate text-[11.5px] font-semibold text-warning">
+                        via {row.on_behalf_of_name}
+                      </p>
+                    )}
+                  </div>
                 </div>
               ),
             },
@@ -108,6 +119,11 @@ export default function AuditPage() {
                 row.entity_type ? <Badge tone="neutral">{titleCase(row.entity_type)}</Badge> : '—',
             },
             {
+              key: 'changes',
+              header: 'What changed',
+              cell: (row: any) => <Changes changes={row.changes} />,
+            },
+            {
               key: 'ip',
               header: 'IP',
               cell: (row: any) => <span className="tabular text-[12px]">{row.ip || '—'}</span>,
@@ -127,4 +143,69 @@ export default function AuditPage() {
       </Card>
     </Page>
   )
+}
+
+/**
+ * The field-level before and after behind an entry.
+ *
+ * "Someone updated a student" is not an audit trail; "fee concession went from
+ * 0 to 100" is. Collapsed by default because most rows have several fields and
+ * the table would be unreadable otherwise.
+ */
+function Changes({ changes }: { changes: Record<string, any> | null | undefined }) {
+  const [open, setOpen] = useState(false)
+  const entries = Object.entries(changes ?? {})
+  if (entries.length === 0) return <span className="text-muted">—</span>
+
+  const fieldDiffs = entries.filter(
+    ([, value]) => value && typeof value === 'object' && 'to' in value,
+  )
+  const plain = entries.filter(([, value]) => !(value && typeof value === 'object' && 'to' in value))
+
+  return (
+    <div className="max-w-[320px]">
+      <button
+        type="button"
+        onClick={() => setOpen((value) => !value)}
+        aria-expanded={open}
+        className="flex items-center gap-1 text-[12.5px] font-semibold text-ink-soft
+                   underline-offset-4 hover:underline"
+      >
+        {entries.length} field{entries.length === 1 ? '' : 's'}
+        <ChevronDown
+          className={cn('h-3 w-3 transition', open && 'rotate-180')}
+          aria-hidden
+        />
+      </button>
+
+      {open && (
+        <dl className="mt-2 space-y-1.5">
+          {fieldDiffs.map(([field, value]) => (
+            <div key={field} className="rounded-field bg-surface-sunken px-2.5 py-1.5">
+              <dt className="text-[11.5px] font-bold text-muted">{titleCase(field)}</dt>
+              <dd className="mt-0.5 flex flex-wrap items-center gap-1.5 text-[12.5px]">
+                <span className="text-danger line-through">{render(value.from)}</span>
+                <span className="text-muted" aria-hidden>→</span>
+                <span className="font-semibold text-success">{render(value.to)}</span>
+              </dd>
+            </div>
+          ))}
+          {plain.map(([field, value]) => (
+            <div key={field} className="rounded-field bg-surface-sunken px-2.5 py-1.5">
+              <dt className="text-[11.5px] font-bold text-muted">{titleCase(field)}</dt>
+              <dd className="mt-0.5 text-[12.5px] font-semibold text-ink">{render(value)}</dd>
+            </div>
+          ))}
+        </dl>
+      )}
+    </div>
+  )
+}
+
+function render(value: unknown): string {
+  if (value === null || value === undefined || value === '') return 'empty'
+  if (typeof value === 'boolean') return value ? 'Yes' : 'No'
+  if (Array.isArray(value)) return value.length ? value.join(', ') : 'empty'
+  if (typeof value === 'object') return JSON.stringify(value)
+  return String(value)
 }

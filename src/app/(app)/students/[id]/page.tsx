@@ -301,7 +301,10 @@ export default function StudentProfilePage({
       {tab === 'Fees' && (
         <div className="space-y-4">
           <Card>
-            <CardHeader title="Fee summary" />
+            <CardHeader
+              title="Fee summary"
+              subtitle="An invoice is a bill the school raised; a receipt is proof of a payment against one."
+            />
             <CardBody className="grid gap-3 pt-2 sm:grid-cols-4">
               <Detail label="Invoices" value={String(data.fees.invoices)} />
               <Detail label="Billed" value={money(data.fees.billed)} />
@@ -311,7 +314,10 @@ export default function StudentProfilePage({
           </Card>
 
           <Card>
-            <CardHeader title="Invoices" />
+            <CardHeader
+              title="Invoices — what the school has charged"
+              subtitle="One per billing period. The balance is what is still owed on it."
+            />
             <DataTable
               columns={[
                 { key: 'number', header: 'Invoice' },
@@ -351,8 +357,7 @@ export default function StudentProfilePage({
                   cell: (row: any) => (
                     <Button
                       size="sm"
-                      variant="ghost"
-                      aria-label="Print invoice"
+                      variant="secondary"
                       loading={pending === `/print/invoice/${row.id}`}
                       onClick={() =>
                         download(`/print/invoice/${row.id}`, `invoice-${row.number}.pdf`, {
@@ -361,6 +366,7 @@ export default function StudentProfilePage({
                       }
                     >
                       <FileText className="h-3.5 w-3.5" aria-hidden />
+                      Bill
                     </Button>
                   ),
                 },
@@ -371,7 +377,10 @@ export default function StudentProfilePage({
           </Card>
 
           <Card>
-            <CardHeader title="Receipts" />
+            <CardHeader
+              title="Receipts — what has been paid"
+              subtitle="Issued automatically on every payment, and numbered so two cannot collide."
+            />
             <DataTable
               columns={[
                 { key: 'receipt_number', header: 'Receipt' },
@@ -400,8 +409,7 @@ export default function StudentProfilePage({
                   cell: (row: any) => (
                     <Button
                       size="sm"
-                      variant="ghost"
-                      aria-label="Print receipt"
+                      variant="secondary"
                       loading={pending === `/print/receipt/${row.id}`}
                       onClick={() =>
                         download(`/print/receipt/${row.id}`, `receipt-${row.receipt_number}.pdf`, {
@@ -410,6 +418,7 @@ export default function StudentProfilePage({
                       }
                     >
                       <Receipt className="h-3.5 w-3.5" aria-hidden />
+                      Receipt
                     </Button>
                   ),
                 },

@@ -7,6 +7,7 @@ import { Avatar } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { ExportButton } from '@/components/resource/export-button'
+import { AssignRollNumbers } from '@/components/students/roll-numbers'
 import { Card } from '@/components/ui/card'
 import { DataTable, type Column } from '@/components/ui/table'
 import { EmptyState } from '@/components/ui/empty'
@@ -183,6 +184,7 @@ export default function StudentsPage() {
             ))}
           </Select>
 
+          {can('students:update') && <AssignRollNumbers />}
           {can('students:export') && (
             <ExportButton path="/students" state={list.state} name="students" />
           )}

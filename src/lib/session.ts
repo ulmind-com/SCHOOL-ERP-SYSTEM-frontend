@@ -18,9 +18,14 @@ interface SessionState {
   deploymentMode: 'saas' | 'dedicated'
   status: 'idle' | 'loading' | 'ready' | 'anonymous'
 
+  /** Set while viewing the app as someone else. */
+  viewingAs: { id: string; name: string; email: string } | null
+
   hydrate: () => Promise<void>
   applyLogin: (response: LoginResponse) => Promise<void>
   signOut: () => Promise<void>
+  viewAs: (userId: string, reason?: string) => Promise<void>
+  stopViewingAs: () => Promise<void>
   /** Wildcard-aware, matching the server's own check. */
   can: (permission: string) => boolean
   canAny: (...permissions: string[]) => boolean
@@ -38,6 +43,7 @@ export const useSession = create<SessionState>((set, get) => ({
   navigation: [],
   deploymentMode: 'saas',
   status: 'idle',
+  viewingAs: null,
 
   async hydrate() {
     if (!tokens.access()) {
@@ -55,6 +61,7 @@ export const useSession = create<SessionState>((set, get) => ({
         status: 'ready',
       })
       if (me.institution) tokens.setTenant(me.institution.slug)
+      set({ viewingAs: tokens.impersonation()?.viewing ?? null })
     } catch {
       tokens.clear()
       set({ user: null, institution: null, navigation: [], status: 'anonymous' })
@@ -76,7 +83,31 @@ export const useSession = create<SessionState>((set, get) => ({
       await api.post('/auth/logout', { refresh_token: refresh }).catch(() => {})
     }
     tokens.clear()
-    set({ user: null, institution: null, navigation: [], status: 'anonymous' })
+    set({ user: null, institution: null, navigation: [], status: 'anonymous',
+          viewingAs: null })
+  },
+
+  /**
+   * Borrow another account for support. The administrator's own session is
+   * parked, not discarded, so stepping back out is one click and not a re-login.
+   */
+  async viewAs(userId, reason = '') {
+    const result = await api.post<{
+      access_token: string
+      user: { id: string; email: string; full_name: string }
+    }>(`/users/${userId}/impersonate`, { reason })
+    tokens.beginImpersonation(result.access_token, {
+      id: result.user.id,
+      name: result.user.full_name,
+      email: result.user.email,
+    })
+    await get().hydrate()
+  },
+
+  async stopViewingAs() {
+    if (!tokens.endImpersonation()) return
+    set({ viewingAs: null })
+    await get().hydrate()
   },
 
   can(permission) {

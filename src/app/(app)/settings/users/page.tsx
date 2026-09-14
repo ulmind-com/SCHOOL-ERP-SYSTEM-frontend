@@ -1,9 +1,10 @@
 'use client'
 
 import { useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { format, parseISO } from 'date-fns'
-import { KeyRound, Search, UserPlus } from 'lucide-react'
+import { Eye, KeyRound, Search, UserPlus } from 'lucide-react'
 import { toast } from 'sonner'
 import { Avatar } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
@@ -21,6 +22,8 @@ import { useSession } from '@/lib/session'
 export default function UsersPage() {
   const client = useQueryClient()
   const can = useSession((state) => state.can)
+  const user = useSession((state) => state.user)
+  const router = useRouter()
   const [search, setSearch] = useState('')
   const [roleFilter, setRoleFilter] = useState('')
   const [page, setPage] = useState(1)
@@ -60,7 +63,25 @@ export default function UsersPage() {
 
   const resetPassword = useMutation({
     mutationFn: (id: string) => api.post<any>(`/users/${id}/reset-password`),
-    onSuccess: (data) => setResult(data),
+    onSuccess: (data) => {
+      // When mail is configured the password never comes back — say so rather
+      // than showing an empty credentials panel.
+      if (data.email_sent) toast.success(data.detail)
+      else setResult(data)
+      invalidate()
+    },
+    onError: (error) =>
+      toast.error(error instanceof ApiError ? error.message : 'Could not reset the password'),
+  })
+
+  const viewAs = useMutation({
+    mutationFn: (id: string) => useSession.getState().viewAs(id),
+    onSuccess: () => {
+      toast.success('You are now viewing the app as this person')
+      router.push('/dashboard')
+    },
+    onError: (error) =>
+      toast.error(error instanceof ApiError ? error.message : 'Could not open that account'),
   })
 
   return (
@@ -168,6 +189,17 @@ export default function UsersPage() {
                     >
                       <KeyRound className="h-3.5 w-3.5" aria-hidden />
                     </button>
+                    {row.is_active && row.id !== user?.id && (
+                      <button
+                        type="button"
+                        title="View the app as this person"
+                        aria-label={`View the app as ${row.full_name}`}
+                        onClick={() => viewAs.mutate(row.id)}
+                        className="grid h-8 w-8 place-items-center rounded-lg text-muted transition hover:bg-surface-sunken hover:text-ink"
+                      >
+                        <Eye className="h-3.5 w-3.5" aria-hidden />
+                      </button>
+                    )}
                     <Button
                       size="sm"
                       variant={row.is_active ? 'ghost' : 'soft'}
