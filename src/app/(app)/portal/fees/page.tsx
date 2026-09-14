@@ -297,8 +297,11 @@ function Instalment({
 }) {
   const due = parseISO(item.due_date)
   const days = differenceInCalendarDays(due, new Date())
-  const when =
-    item.status === 'paid'
+  // Nothing that has not been billed is late — calling it overdue alarms a
+  // family about a payment the office has not asked for.
+  const when = !item.raised
+    ? 'Not billed yet'
+    : item.status === 'paid'
       ? 'Settled'
       : days < 0
         ? `${Math.abs(days)} day${Math.abs(days) === 1 ? '' : 's'} overdue`
