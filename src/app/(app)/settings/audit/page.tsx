@@ -74,8 +74,18 @@ export default function AuditPage() {
             {
               key: 'created_at',
               header: 'When',
+              className: 'w-[120px]',
               cell: (row: any) =>
-                row.created_at ? format(parseISO(row.created_at), 'd MMM yyyy, h:mm a') : '—',
+                row.created_at ? (
+                  <span className="block whitespace-nowrap text-[13px] font-semibold text-ink">
+                    {format(parseISO(row.created_at), 'd MMM')}
+                    <span className="ml-1.5 font-normal text-muted">
+                      {format(parseISO(row.created_at), 'h:mm a')}
+                    </span>
+                  </span>
+                ) : (
+                  '—'
+                ),
             },
             {
               key: 'actor_name',
