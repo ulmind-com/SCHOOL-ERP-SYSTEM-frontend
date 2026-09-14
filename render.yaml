@@ -1,0 +1,31 @@
+# Render blueprint — Scholarly ERP web app.
+#
+# The API lives in its own repository, so the two services cannot reference each
+# other automatically. NEXT_PUBLIC_API_URL must be set by hand to the API's URL,
+# and the API's CORS_ORIGINS must be set to this service's URL.
+#
+# NEXT_PUBLIC_* values are baked in at build time, so changing one requires a
+# redeploy — not just a restart.
+
+services:
+  - type: web
+    name: scholarly-web
+    runtime: node
+    plan: starter
+    region: singapore
+    buildCommand: npm ci && npm run build
+    startCommand: npm run start
+    healthCheckPath: /login
+    autoDeploy: true
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      - key: NEXT_PUBLIC_APP_NAME
+        value: Scholarly
+      - key: NEXT_PUBLIC_DEPLOYMENT_MODE
+        value: saas
+      # The API service's URL, e.g. https://scholarly-api.onrender.com
+      - key: NEXT_PUBLIC_API_URL
+        sync: false
+      - key: NEXT_PUBLIC_IMAGEKIT_URL_ENDPOINT
+        sync: false

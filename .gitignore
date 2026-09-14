@@ -1,0 +1,23 @@
+# Env / secrets
+.env
+.env.*
+!.env.example
+
+# Node
+node_modules/
+.next/
+.next-build/
+out/
+.turbo/
+*.tsbuildinfo
+.npm/
+
+# OS / editors
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/*
+!.vscode/extensions.json
+
+# Logs
+*.log

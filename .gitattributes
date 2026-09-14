@@ -1,0 +1,5 @@
+package-lock.json linguist-generated=true
+* text=auto eol=lf
+*.png binary
+*.jpg binary
+*.svg text

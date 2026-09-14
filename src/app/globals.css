@@ -1,0 +1,127 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/*
+ * Design tokens.
+ *
+ * Palette and type are lifted from the reference dashboard: a cool grey canvas,
+ * white cards with generous radii, near-black as the only strong colour, and
+ * pastel butter / blush / lilac reserved for stat tiles so the numbers carry
+ * the page instead of the chrome.
+ */
+:root {
+  --canvas: 238 240 242;
+  --surface: 255 255 255;
+  --surface-sunken: 247 248 249;
+
+  --ink: 17 18 20;
+  --ink-soft: 74 77 82;
+  --muted: 140 144 150;
+  --line: 234 236 239;
+
+  --brand: 17 18 20;
+  --accent: 250 238 124;
+
+  /* Stat-tile pastels */
+  --butter: 250 238 124;
+  --blush: 251 222 222;
+  --lilac: 233 230 252;
+  --mint: 223 245 229;
+  --sky: 219 234 254;
+
+  --success: 23 178 106;
+  --warning: 247 144 9;
+  --danger: 240 68 56;
+  --info: 110 86 207;
+
+  --ring: 17 18 20;
+}
+
+* {
+  border-color: rgb(var(--line));
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  background: rgb(var(--canvas));
+  color: rgb(var(--ink));
+  font-feature-settings: 'cv11', 'ss01';
+  font-variant-ligatures: contextual;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+@layer base {
+  h1, h2, h3, h4 {
+    letter-spacing: -0.02em;
+    font-weight: 700;
+  }
+  /* Numbers in tables should line up; text should stay proportional. */
+  .tabular {
+    font-variant-numeric: tabular-nums;
+  }
+  :focus-visible {
+    outline: 2px solid rgb(var(--ring));
+    outline-offset: 2px;
+    border-radius: 6px;
+  }
+}
+
+@layer components {
+  .card {
+    @apply rounded-card bg-surface shadow-card;
+  }
+  .panel {
+    @apply rounded-panel bg-surface shadow-card;
+  }
+  .hairline {
+    @apply border-b border-line;
+  }
+  .chip {
+    @apply inline-flex items-center gap-1.5 rounded-pill px-2.5 py-1 text-xs font-semibold;
+  }
+  .field {
+    @apply w-full rounded-field border border-line bg-surface px-3.5 py-2.5 text-sm
+           text-ink placeholder:text-muted transition
+           focus:border-ink/20 focus:outline-none focus:ring-2 focus:ring-ink/10;
+  }
+  .label {
+    @apply mb-1.5 block text-[13px] font-semibold text-ink-soft;
+  }
+  .skeleton {
+    @apply relative overflow-hidden rounded-lg bg-surface-sunken;
+  }
+  .skeleton::after {
+    content: '';
+    @apply absolute inset-0 -translate-x-full animate-shimmer;
+    background-image: linear-gradient(
+      90deg,
+      transparent,
+      rgb(255 255 255 / 0.7),
+      transparent
+    );
+  }
+}
+
+/* Scrollbars: present but quiet. */
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb {
+  background: rgb(var(--muted) / 0.28);
+  border: 3px solid transparent;
+  border-radius: 999px;
+  background-clip: content-box;
+}
+::-webkit-scrollbar-thumb:hover { background: rgb(var(--muted) / 0.5); background-clip: content-box; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
