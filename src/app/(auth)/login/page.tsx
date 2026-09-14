@@ -25,7 +25,7 @@ function LoginScreen() {
   const params = useSearchParams()
   const applyLogin = useSession((state) => state.applyLogin)
 
-  const [email, setEmail] = useState('')
+  const [email, setEmail] = useState(() => params.get('email') ?? '')
   const [password, setPassword] = useState('')
   const [institution, setInstitution] = useState<string | null>(null)
   const [choices, setChoices] = useState<InstitutionChoice[]>([])
@@ -49,7 +49,12 @@ function LoginScreen() {
       await applyLogin(response)
       if (response.institution) tokens.setTenant(response.institution.slug)
       const next = params.get('next')
-      const home = platformMode ? '/platform' : next || '/dashboard'
+      // A family's home is their own record, not the staff dashboard.
+      const portalHome =
+        response.user.portal === 'student' || response.user.portal === 'parent'
+          ? '/portal/me'
+          : '/dashboard'
+      const home = platformMode ? '/platform' : next || portalHome
       router.replace(response.must_change_password ? '/account/password?first=1' : home)
     } catch (caught) {
       if (caught instanceof ApiError) {
