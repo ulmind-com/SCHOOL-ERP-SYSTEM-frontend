@@ -14,7 +14,6 @@ import { Page } from '@/components/layout/page'
 import { StatCard } from '@/components/ui/stat-card'
 import { TabSwitcher } from '@/components/resource/tab-switcher'
 import { useDownload } from '@/hooks/use-download'
-import { useOptions } from '@/hooks/use-resource'
 import { ApiError, api } from '@/lib/api'
 import { money } from '@/lib/utils'
 
@@ -30,11 +29,17 @@ const PAYABLE = ['issued', 'partially_paid', 'overdue']
  */
 export default function PortalFeesPage() {
   const { download, pending } = useDownload()
-  const { data: children } = useOptions('/students')
+  // Not /students: a family holds invoices:read but not students:read, and has
+  // no business listing the roll to find its own name.
+  const account = useQuery({
+    queryKey: ['my-fee-account'],
+    queryFn: () => api.get<any>('/fees/my-account'),
+  })
+  const children: any[] = account.data?.students ?? []
   const [studentId, setStudentId] = useState('')
 
   useEffect(() => {
-    if (!studentId && children?.length) setStudentId(children[0].id)
+    if (!studentId && children.length) setStudentId(children[0].id)
   }, [children, studentId])
 
   const ledger = useQuery({
@@ -61,7 +66,7 @@ export default function PortalFeesPage() {
   const pay = usePayment(studentId)
   const child = (children ?? []).find((c: any) => c.id === studentId)
 
-  if (!children?.length) {
+  if (!account.isLoading && children.length === 0) {
     return (
       <Page title="Fees & Payments">
         <Card>
@@ -80,7 +85,13 @@ export default function PortalFeesPage() {
   return (
     <Page
       title="Fees & Payments"
-      subtitle={child ? `${child.full_name} · ${child.admission_number}` : 'Your fee account'}
+      subtitle={
+        child
+          ? [child.full_name, child.class_name, child.admission_number]
+              .filter(Boolean)
+              .join(' · ')
+          : 'Your fee account'
+      }
       actions={
         unpaid.length > 0 && gateway.data?.enabled ? (
           <Button
@@ -330,6 +341,7 @@ function usePayment(studentId: string) {
     onSuccess: (result) => {
       toast.success(result.detail ?? `Paid — receipt ${result.receipt_number}`)
       void client.invalidateQueries({ queryKey: ['my-ledger'] })
+      void client.invalidateQueries({ queryKey: ['my-fee-account'] })
     },
     onError: (error) => {
       if (error instanceof Error && error.message === 'Payment cancelled') return
