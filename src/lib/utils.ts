@@ -80,3 +80,21 @@ export function thumb(url: string | undefined | null, size = 96) {
   const sep = url.includes('?') ? '&' : '?'
   return `${url}${sep}tr=w-${size},h-${size},c-maintain_ratio,q-80`
 }
+
+/**
+ * A subject label that stays unambiguous in a flat dropdown.
+ *
+ * Subjects are per-class, so a school running Class 7 and Class 8 has two rows
+ * called "Mathematics". The code is what tells them apart on paper, so it is
+ * what tells them apart here.
+ */
+export function subjectLabel(subject: {
+  name?: string
+  code?: string
+  class_name?: string
+}): string {
+  const parts = [subject.name ?? '']
+  if (subject.class_name) parts.push(subject.class_name)
+  if (subject.code) parts.push(subject.code)
+  return parts.filter(Boolean).join(' · ')
+}

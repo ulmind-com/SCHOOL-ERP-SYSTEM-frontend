@@ -3,7 +3,7 @@
 import { format, parseISO } from 'date-fns'
 import { Avatar } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
-import { money, titleCase } from '@/lib/utils'
+import { money, subjectLabel, titleCase } from '@/lib/utils'
 import type { ResourceDef } from './types'
 
 const date = (value?: string | null) => {
@@ -659,7 +659,7 @@ export const ASSIGNMENTS: ResourceDef = {
   defaultSort: 'due_date',
   defaultSortDir: 'desc',
   filters: [
-    { name: 'subject_id', label: 'Subject', optionsFrom: '/subjects' },
+    { name: 'subject_id', label: 'Subject', optionsFrom: '/subjects', optionLabel: subjectLabel },
     {
       name: 'status',
       label: 'Status',
@@ -681,7 +681,15 @@ export const ASSIGNMENTS: ResourceDef = {
   ],
   fields: [
     { name: 'title', label: 'Title', required: true, full: true },
-    { name: 'subject_id', label: 'Subject', type: 'remote-select', optionsFrom: '/subjects' },
+    {
+      name: 'subject_id',
+      label: 'Subject',
+      type: 'remote-select',
+      optionsFrom: '/subjects',
+      // Subjects are per-class, so a flat list shows "Mathematics" twice; the
+      // code is what tells them apart.
+      optionLabel: subjectLabel,
+    },
     { name: 'class_id', label: 'Class', type: 'remote-select', optionsFrom: '/classes' },
     {
       name: 'type',

@@ -13,15 +13,33 @@ import { DataTable } from '@/components/ui/table'
 import { EmptyState } from '@/components/ui/empty'
 import { Input, Select } from '@/components/ui/input'
 import { Page } from '@/components/layout/page'
+import { ExportButton } from '@/components/resource/export-button'
 import { Pagination } from '@/components/ui/pagination'
+import { useDownload } from '@/hooks/use-download'
 import { useOptions, useResourceList } from '@/hooks/use-resource'
 import { ApiError, api } from '@/lib/api'
 import { useSession } from '@/lib/session'
 import { money } from '@/lib/utils'
 
+/**
+ * A structure can carry a monthly tuition, a semester lab fee and a one-time
+ * admission charge. A run bills one of those schedules, so none of them lands
+ * on the wrong month.
+ */
+const BILLING_CYCLES = [
+  { value: 'all', label: 'Everything in the structure' },
+  { value: 'monthly', label: 'Monthly' },
+  { value: 'quarterly', label: 'Quarterly' },
+  { value: 'half_yearly', label: 'Half-yearly' },
+  { value: 'semester', label: 'Semester' },
+  { value: 'yearly', label: 'Yearly' },
+  { value: 'one_time', label: 'One-time charges' },
+]
+
 export default function InvoicesPage() {
   const client = useQueryClient()
   const can = useSession((state) => state.can)
+  const { download, pending } = useDownload()
   const [generating, setGenerating] = useState(false)
   const [preview, setPreview] = useState<any>(null)
 
@@ -49,6 +67,8 @@ export default function InvoicesPage() {
       fee_structure_id: String(form.get('fee_structure_id') ?? ''),
       academic_year_id: String(form.get('academic_year_id') ?? ''),
       class_id: String(form.get('class_id') ?? '') || null,
+      cycle: String(form.get('cycle') ?? 'all'),
+      period_index: Number(form.get('period_index')) || null,
       period_label: String(form.get('period_label') ?? '') || null,
       due_date: String(form.get('due_date') ?? '') || null,
       dry_run: dryRun,
@@ -80,7 +100,8 @@ export default function InvoicesPage() {
       subtitle={list.data ? `${list.data.meta.total} invoices raised` : 'Billing history'}
       actions={
         can('invoices:create') ? (
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
+            <ExportButton path="/invoices" state={list.state} name="invoices" />
             <Button variant="secondary" onClick={() => markOverdue.mutate()} loading={markOverdue.isPending}>
               <AlertTriangle className="h-4 w-4" aria-hidden />
               Mark overdue
@@ -181,6 +202,25 @@ export default function InvoicesPage() {
               },
             },
             { key: 'status', header: 'Status', align: 'center', cell: (r) => <Badge status={r.status} /> },
+            {
+              key: '__print',
+              header: '',
+              align: 'right',
+              className: 'w-14',
+              cell: (r) => (
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  aria-label={`Download invoice ${r.number}`}
+                  loading={pending === `/print/invoice/${r.id}`}
+                  onClick={() =>
+                    download(`/print/invoice/${r.id}`, `invoice-${r.number}.pdf`, { open: true })
+                  }
+                >
+                  <FileText className="h-3.5 w-3.5" aria-hidden />
+                </Button>
+              ),
+            },
           ]}
           rows={list.data?.items ?? []}
           loading={list.isLoading}
@@ -222,6 +262,10 @@ export default function InvoicesPage() {
               <p className="text-[13.5px] font-semibold text-ink">{preview.detail}</p>
               <p className="tabular mt-1 text-[24px] font-extrabold text-ink">
                 {money(preview.total_billed)}
+              </p>
+              <p className="mt-1 text-[12.5px] text-muted">
+                {preview.period_label} · due{' '}
+                {preview.due_date ? format(parseISO(preview.due_date), 'd MMM yyyy') : '—'}
               </p>
               {preview.skipped_existing > 0 && (
                 <p className="mt-1 text-[12.5px] text-warning">
@@ -284,13 +328,38 @@ export default function InvoicesPage() {
               ))}
             </Select>
             <div className="grid gap-4 sm:grid-cols-2">
+              <Select
+                name="cycle"
+                label="Billing cycle"
+                defaultValue="all"
+                hint="Only components on this schedule are billed"
+              >
+                {BILLING_CYCLES.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </Select>
+              <Input
+                name="period_index"
+                label="Instalment number"
+                type="number"
+                min={1}
+                placeholder="Auto"
+                hint="Quarter 2, Semester 1 — blank uses today's date"
+              />
               <Input
                 name="period_label"
-                label="Period"
-                placeholder="September 2026"
-                hint="Identifies the billing run"
+                label="Period label"
+                placeholder="Auto — e.g. September 2026"
+                hint="Identifies the billing run; leave blank to derive it"
               />
-              <Input name="due_date" label="Due date" type="date" />
+              <Input
+                name="due_date"
+                label="Due date"
+                type="date"
+                hint="Blank follows the structure's own due day"
+              />
             </div>
 
             <div className="flex justify-end gap-3 pt-2">

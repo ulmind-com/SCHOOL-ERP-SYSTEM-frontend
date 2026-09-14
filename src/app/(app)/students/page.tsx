@@ -2,10 +2,11 @@
 
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { Download, Plus, Search, SlidersHorizontal } from 'lucide-react'
+import { Plus, Search, SlidersHorizontal } from 'lucide-react'
 import { Avatar } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { ExportButton } from '@/components/resource/export-button'
 import { Card } from '@/components/ui/card'
 import { DataTable, type Column } from '@/components/ui/table'
 import { EmptyState } from '@/components/ui/empty'
@@ -183,10 +184,7 @@ export default function StudentsPage() {
           </Select>
 
           {can('students:export') && (
-            <Button variant="secondary" size="md">
-              <Download className="h-4 w-4" aria-hidden />
-              Export
-            </Button>
+            <ExportButton path="/students" state={list.state} name="students" />
           )}
         </div>
 

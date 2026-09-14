@@ -4,6 +4,7 @@ import { useMemo, useState } from 'react'
 import { Pencil, Plus, Search, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
+import { ExportButton } from '@/components/resource/export-button'
 import { Card } from '@/components/ui/card'
 import { ConfirmDialog, Drawer } from '@/components/ui/drawer'
 import { DataTable, type Column } from '@/components/ui/table'
@@ -47,6 +48,9 @@ export function ResourceScreen<T extends { id: string }>({
   const remove = useRemove(def.path, def.invalidates)
 
   const canCreate = can(`${def.module}:create`)
+  // Whoever may read the list may take a copy of it; modules that declare a
+  // dedicated export permission have the API enforce that on top.
+  const canRead = can(`${def.module}:read`)
   const canUpdate = can(`${def.module}:update`)
   const canDelete = can(`${def.module}:delete`)
 
@@ -135,17 +139,20 @@ export function ResourceScreen<T extends { id: string }>({
       title={def.title}
       subtitle={list.data ? `${list.data.meta.total} ${def.plural.toLowerCase()}` : def.subtitle}
       actions={
-        canCreate ? (
-          <Button
-            onClick={() => {
-              setErrors({})
-              setCreating(true)
-            }}
-          >
-            <Plus className="h-4 w-4" aria-hidden />
-            {def.createLabel ?? `New ${def.singular.toLowerCase()}`}
-          </Button>
-        ) : undefined
+        <div className="flex flex-wrap gap-2">
+          {canRead && <ExportButton path={def.path} state={list.state} name={def.path.slice(1)} />}
+          {canCreate && (
+            <Button
+              onClick={() => {
+                setErrors({})
+                setCreating(true)
+              }}
+            >
+              <Plus className="h-4 w-4" aria-hidden />
+              {def.createLabel ?? `New ${def.singular.toLowerCase()}`}
+            </Button>
+          )}
+        </div>
       }
     >
       {prefix}

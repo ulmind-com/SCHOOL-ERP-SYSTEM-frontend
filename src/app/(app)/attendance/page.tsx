@@ -75,6 +75,7 @@ export default function AttendancePage() {
       if (row.status) initial[row.student_id] = row.status
     }
     setMarks(initial)
+    setBeforeBulk(null)
   }, [register.data])
 
   const students: RegisterStudent[] = register.data?.students ?? []
@@ -109,7 +110,21 @@ export default function AttendancePage() {
       toast.error(error instanceof ApiError ? error.message : 'Could not save attendance'),
   })
 
+  // Pressing "All present" a second time puts the register back the way it was,
+  // so a mis-click costs nothing — otherwise the only way back is to reload and
+  // lose everything already marked.
+  const [beforeBulk, setBeforeBulk] = useState<Record<string, Status> | null>(null)
+
+  const bulkApplied = (status: Status) =>
+    students.length > 0 && students.every((s) => marks[s.student_id] === status)
+
   function markAll(status: Status) {
+    if (bulkApplied(status) && beforeBulk) {
+      setMarks(beforeBulk)
+      setBeforeBulk(null)
+      return
+    }
+    setBeforeBulk(marks)
     setMarks(Object.fromEntries(students.map((s) => [s.student_id, status])))
   }
 
@@ -183,11 +198,19 @@ export default function AttendancePage() {
             )}
             {!locked && students.length > 0 && (
               <>
-                <Button variant="soft" size="sm" onClick={() => markAll('present')}>
-                  All present
+                <Button
+                  variant={bulkApplied('present') ? 'secondary' : 'soft'}
+                  size="sm"
+                  onClick={() => markAll('present')}
+                >
+                  {bulkApplied('present') && beforeBulk ? 'Undo all present' : 'All present'}
                 </Button>
-                <Button variant="ghost" size="sm" onClick={() => markAll('absent')}>
-                  All absent
+                <Button
+                  variant={bulkApplied('absent') ? 'secondary' : 'ghost'}
+                  size="sm"
+                  onClick={() => markAll('absent')}
+                >
+                  {bulkApplied('absent') && beforeBulk ? 'Undo all absent' : 'All absent'}
                 </Button>
               </>
             )}

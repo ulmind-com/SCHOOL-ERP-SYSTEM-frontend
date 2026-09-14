@@ -1,24 +1,47 @@
 'use client'
 
-import { use, useState } from 'react'
+import { use, useRef, useState } from 'react'
 import Link from 'next/link'
-import { useQuery } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { format, parseISO } from 'date-fns'
-import { CalendarCheck, FileText, IdCard, Mail, MapPin, Phone, Receipt, User } from 'lucide-react'
+import {
+  CalendarCheck,
+  FileText,
+  IdCard,
+  Mail,
+  MapPin,
+  Phone,
+  Receipt,
+  Upload,
+  User,
+} from 'lucide-react'
+import { toast } from 'sonner'
+import { AttendanceCalendar } from '@/components/students/attendance-calendar'
 import { Avatar } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardBody, CardHeader } from '@/components/ui/card'
 import { DataTable } from '@/components/ui/table'
 import { EmptyState } from '@/components/ui/empty'
+import { Select } from '@/components/ui/input'
 import { Page } from '@/components/layout/page'
 import { useDownload } from '@/hooks/use-download'
 import { useOptions } from '@/hooks/use-resource'
-import { api } from '@/lib/api'
+import { ApiError, api } from '@/lib/api'
 import { useSession } from '@/lib/session'
 import { cn, money, percent, titleCase } from '@/lib/utils'
 
 const TABS = ['Overview', 'Attendance', 'Fees', 'Results', 'Documents'] as const
+
+const DOCUMENT_CATEGORIES = [
+  { value: 'student', label: 'General' },
+  { value: 'identity', label: 'Identity proof' },
+  { value: 'birth_certificate', label: 'Birth certificate' },
+  { value: 'transfer_certificate', label: 'Transfer certificate' },
+  { value: 'marksheet', label: 'Marksheet' },
+  { value: 'photograph', label: 'Photograph' },
+  { value: 'medical', label: 'Medical' },
+]
 type Tab = (typeof TABS)[number]
 
 export default function StudentProfilePage({
@@ -258,7 +281,12 @@ export default function StudentProfilePage({
               <Detail label="Late" value={String(data.attendance.late)} />
               <Detail label="Percentage" value={percent(data.attendance.percentage, 1)} />
             </div>
-            {data.attendance.total_days === 0 && (
+            {data.attendance_days?.length ? (
+              <div className="mt-5 border-t border-line pt-5">
+                <p className="mb-3 text-[13px] font-bold text-ink">Day by day</p>
+                <AttendanceCalendar days={data.attendance_days} />
+              </div>
+            ) : (
               <EmptyState
                 className="mt-4"
                 icon="check-square"
@@ -394,51 +422,170 @@ export default function StudentProfilePage({
       )}
 
       {tab === 'Results' && (
-        <Card>
-          <CardHeader title="Report cards" />
-          <CardBody className="pt-2">
-            {data.report_cards?.length ? (
-              <ul className="divide-y divide-line">
-                {data.report_cards.map((card: any) => (
-                  <li key={card.id} className="flex items-center gap-4 py-3">
-                    <span className="flex-1 text-[14px] font-bold text-ink">
-                      {card.exam_name ?? 'Examination'}
-                    </span>
-                    <span className="tabular text-[13.5px] font-semibold text-ink-soft">
-                      {percent(card.percentage, 1)}
-                    </span>
-                    <Badge status={card.result} />
-                  </li>
-                ))}
-              </ul>
-            ) : (
-              <EmptyState
-                icon="trophy"
-                title="No results published"
-                description="Report cards appear here once an exam's results are published."
-              />
-            )}
-          </CardBody>
-        </Card>
+        <div className="space-y-4">
+          {/* Marks first: they exist as soon as a teacher enters them, whereas a
+              report card only appears once the exam is published. */}
+          {data.exam_results?.length ? (
+            data.exam_results.map((exam: any) => (
+              <Card key={exam.exam_id}>
+                <CardHeader
+                  title={exam.exam_name}
+                  subtitle={[titleCase(exam.exam_type ?? ''), titleCase(exam.status ?? '')]
+                    .filter(Boolean)
+                    .join(' · ')}
+                  action={
+                    <div className="flex items-center gap-3">
+                      <span className="tabular text-[13.5px] font-bold text-ink">
+                        {exam.obtained} / {exam.max_marks}
+                      </span>
+                      {exam.percentage !== null && (
+                        <Badge tone={exam.percentage >= 33 ? 'success' : 'danger'}>
+                          {percent(exam.percentage, 1)}
+                        </Badge>
+                      )}
+                      {exams?.length ? (
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          loading={pending === `/print/report-card/${id}/${exam.exam_id}`}
+                          onClick={() =>
+                            download(
+                              `/print/report-card/${id}/${exam.exam_id}`,
+                              `report-card-${data.admission_number}-${exam.exam_name}.pdf`,
+                              { open: true },
+                            )
+                          }
+                        >
+                          <FileText className="h-3.5 w-3.5" aria-hidden />
+                          PDF
+                        </Button>
+                      ) : null}
+                    </div>
+                  }
+                />
+                <DataTable
+                  columns={[
+                    {
+                      key: 'subject_name',
+                      header: 'Subject',
+                      cell: (row: any) => (
+                        <div className="min-w-0">
+                          <p className="truncate text-[13.5px] font-bold text-ink">
+                            {row.subject_name}
+                          </p>
+                          {row.code && <p className="text-[12px] text-muted">{row.code}</p>}
+                        </div>
+                      ),
+                    },
+                    {
+                      key: 'marks_obtained',
+                      header: 'Marks',
+                      align: 'right',
+                      cell: (row: any) =>
+                        row.marks_obtained === null || row.marks_obtained === undefined ? (
+                          <span className="text-muted">Not marked</span>
+                        ) : (
+                          <span className="tabular font-bold text-ink">
+                            {row.marks_obtained} / {row.max_marks}
+                          </span>
+                        ),
+                    },
+                    {
+                      key: 'percentage',
+                      header: '%',
+                      align: 'right',
+                      cell: (row: any) =>
+                        row.percentage === null || row.percentage === undefined
+                          ? '—'
+                          : percent(row.percentage, 1),
+                    },
+                    {
+                      key: 'grade',
+                      header: 'Grade',
+                      align: 'center',
+                      cell: (row: any) => row.grade || '—',
+                    },
+                    {
+                      key: 'is_pass',
+                      header: 'Result',
+                      align: 'center',
+                      cell: (row: any) =>
+                        row.is_pass === null || row.is_pass === undefined ? (
+                          <span className="text-muted">—</span>
+                        ) : (
+                          <Badge tone={row.is_pass ? 'success' : 'danger'}>
+                            {row.is_pass ? 'Pass' : 'Fail'}
+                          </Badge>
+                        ),
+                    },
+                  ]}
+                  rows={exam.subjects}
+                />
+              </Card>
+            ))
+          ) : (
+            <Card>
+              <CardBody>
+                <EmptyState
+                  icon="trophy"
+                  title="No marks entered yet"
+                  description="Marks appear here as soon as a teacher saves them on the Results screen."
+                />
+              </CardBody>
+            </Card>
+          )}
+
+          {data.report_cards?.length ? (
+            <Card>
+              <CardHeader title="Report cards" subtitle="Published results" />
+              <CardBody className="pt-2">
+                <ul className="divide-y divide-line">
+                  {data.report_cards.map((card: any) => (
+                    <li key={card.id} className="flex items-center gap-4 py-3">
+                      <span className="flex-1 text-[14px] font-bold text-ink">
+                        {card.exam_name ?? 'Examination'}
+                      </span>
+                      <span className="tabular text-[13.5px] font-semibold text-ink-soft">
+                        {percent(card.percentage, 1)}
+                      </span>
+                      <Badge status={card.result} />
+                    </li>
+                  ))}
+                </ul>
+              </CardBody>
+            </Card>
+          ) : null}
+        </div>
       )}
 
       {tab === 'Documents' && (
         <Card>
-          <CardHeader title="Documents" />
+          <CardHeader
+            title="Documents"
+            subtitle="Birth certificates, transfer certificates and photographs"
+            action={can('documents:create') ? <UploadButton studentId={id} /> : undefined}
+          />
           <CardBody className="pt-2">
             {data.documents?.length ? (
               <ul className="grid gap-2 sm:grid-cols-2">
-                {data.documents.map((file: any, index: number) => (
-                  <li key={file.file_id ?? index}>
+                {data.documents.map((doc: any) => (
+                  <li key={doc.id}>
                     <a
-                      href={file.url}
+                      href={doc.file?.url}
                       target="_blank"
                       rel="noreferrer"
                       className="flex items-center gap-3 rounded-field bg-surface-sunken px-3.5 py-3
                                  transition hover:bg-ink/[0.05]"
                     >
-                      <span className="truncate text-[13.5px] font-semibold text-ink">
-                        {file.name}
+                      <FileText className="h-4 w-4 shrink-0 text-muted" aria-hidden />
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate text-[13.5px] font-semibold text-ink">
+                          {doc.name}
+                        </span>
+                        <span className="block truncate text-[12px] text-muted">
+                          {titleCase(doc.category ?? 'general')}
+                          {doc.created_at ? ` · ${fmtDate(doc.created_at)}` : ''}
+                        </span>
                       </span>
                     </a>
                   </li>
@@ -495,6 +642,73 @@ function Tile({
         <span className="text-[12px] font-semibold">{label}</span>
       </div>
       <p className="tabular mt-1 text-[17px] font-extrabold text-ink">{value}</p>
+    </div>
+  )
+}
+
+/**
+ * Files go to ImageKit through the API, which also files them in the vault
+ * against this student — so the same upload shows up here, on the Documents
+ * screen, and in the institution's storage total.
+ */
+function UploadButton({ studentId }: { studentId: string }) {
+  const queryClient = useQueryClient()
+  const input = useRef<HTMLInputElement>(null)
+  const [category, setCategory] = useState('student')
+
+  const upload = useMutation({
+    mutationFn: (file: File) => {
+      const form = new FormData()
+      form.append('file', file)
+      form.append('category', category)
+      form.append('owner_type', 'student')
+      form.append('owner_id', studentId)
+      form.append('name', file.name)
+      return api.upload<any>('/files/upload', form)
+    },
+    onSuccess: () => {
+      toast.success('Document uploaded')
+      queryClient.invalidateQueries({ queryKey: ['student-profile', studentId] })
+    },
+    onError: (error) =>
+      toast.error(error instanceof ApiError ? error.message : 'Could not upload that file'),
+  })
+
+  return (
+    <div className="flex items-center gap-2">
+      <Select
+        aria-label="Document type"
+        value={category}
+        onChange={(event) => setCategory(event.target.value)}
+        containerClassName="w-auto"
+        className="min-w-[150px] rounded-pill border-transparent bg-surface-sunken"
+      >
+        {DOCUMENT_CATEGORIES.map((option) => (
+          <option key={option.value} value={option.value}>
+            {option.label}
+          </option>
+        ))}
+      </Select>
+      <input
+        ref={input}
+        type="file"
+        className="hidden"
+        onChange={(event) => {
+          const file = event.target.files?.[0]
+          if (file) upload.mutate(file)
+          // Clear it, or picking the same file twice does nothing.
+          event.target.value = ''
+        }}
+      />
+      <Button
+        variant="secondary"
+        size="md"
+        loading={upload.isPending}
+        onClick={() => input.current?.click()}
+      >
+        <Upload className="h-4 w-4" aria-hidden />
+        Upload
+      </Button>
     </div>
   )
 }

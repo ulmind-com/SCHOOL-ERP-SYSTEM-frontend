@@ -2,7 +2,7 @@
 
 import { format, parseISO } from 'date-fns'
 import { Badge } from '@/components/ui/badge'
-import { money, titleCase } from '@/lib/utils'
+import { money, subjectLabel, titleCase } from '@/lib/utils'
 import type { ResourceDef } from './types'
 
 const date = (value?: string | null) => {
@@ -61,7 +61,7 @@ export const SYLLABUS: ResourceDef = {
   plural: 'Syllabus units',
   icon: 'list-checks',
   defaultSort: 'order',
-  filters: [{ name: 'subject_id', label: 'Subject', optionsFrom: '/subjects' }],
+  filters: [{ name: 'subject_id', label: 'Subject', optionsFrom: '/subjects', optionLabel: subjectLabel }],
   columns: [
     { key: 'title', header: 'Unit', sortable: true, cell: (r) => strong(r.title) },
     { key: 'order', header: 'Order', align: 'center' },
@@ -75,7 +75,7 @@ export const SYLLABUS: ResourceDef = {
   ],
   fields: [
     { name: 'title', label: 'Unit title', required: true, full: true },
-    { name: 'subject_id', label: 'Subject', type: 'remote-select', optionsFrom: '/subjects', required: true },
+    { name: 'subject_id', label: 'Subject', type: 'remote-select', optionsFrom: '/subjects', optionLabel: subjectLabel, required: true },
     { name: 'class_id', label: 'Class', type: 'remote-select', optionsFrom: '/classes' },
     { name: 'order', label: 'Order', type: 'number', defaultValue: 1 },
     { name: 'planned_hours', label: 'Planned hours', type: 'number' },
@@ -94,7 +94,7 @@ export const MATERIALS: ResourceDef = {
   defaultSort: 'created_at',
   defaultSortDir: 'desc',
   filters: [
-    { name: 'subject_id', label: 'Subject', optionsFrom: '/subjects' },
+    { name: 'subject_id', label: 'Subject', optionsFrom: '/subjects', optionLabel: subjectLabel },
     { name: 'type', label: 'Type', options: opts(['document', 'video', 'link', 'slide', 'quiz']) },
   ],
   columns: [
@@ -111,7 +111,7 @@ export const MATERIALS: ResourceDef = {
   ],
   fields: [
     { name: 'title', label: 'Title', required: true, full: true },
-    { name: 'subject_id', label: 'Subject', type: 'remote-select', optionsFrom: '/subjects' },
+    { name: 'subject_id', label: 'Subject', type: 'remote-select', optionsFrom: '/subjects', optionLabel: subjectLabel },
     { name: 'class_id', label: 'Class', type: 'remote-select', optionsFrom: '/classes' },
     { name: 'type', label: 'Type', type: 'select', defaultValue: 'document', options: opts(['document', 'video', 'link', 'slide', 'quiz']) },
     { name: 'external_url', label: 'External link', placeholder: 'https://…' },
@@ -148,6 +148,13 @@ export const EXAMS: ResourceDef = {
     { name: 'start_date', label: 'Start date', type: 'date' },
     { name: 'end_date', label: 'End date', type: 'date' },
     { name: 'weightage_percent', label: 'Weightage (%)', type: 'number', defaultValue: 100 },
+    {
+      name: 'grade_scale_id',
+      label: 'Grade scale',
+      type: 'remote-select',
+      optionsFrom: '/grade-scales',
+      hint: 'Blank uses the institution default',
+    },
     { name: 'status', label: 'Status', type: 'select', defaultValue: 'scheduled', options: opts(['scheduled', 'ongoing', 'marks_entry', 'completed', 'published']) },
     { name: 'instructions', label: 'Instructions', type: 'textarea' },
   ],

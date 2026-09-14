@@ -32,7 +32,16 @@ export default function NewStudentPage() {
     },
     onError: (error) => {
       if (error instanceof ApiError) {
-        setFieldErrors(error.fields)
+        // The API validates the nested body, so it reports "student.first_name";
+        // the inputs here are named flat.
+        setFieldErrors(
+          Object.fromEntries(
+            Object.entries(error.fields).map(([field, message]) => [
+              field.replace(/^student\./, ''),
+              message,
+            ]),
+          ),
+        )
         toast.error(error.message)
       }
     },

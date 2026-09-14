@@ -9,6 +9,7 @@ import { Card } from '@/components/ui/card'
 import { Drawer } from '@/components/ui/drawer'
 import { EmptyState } from '@/components/ui/empty'
 import { Input, Select } from '@/components/ui/input'
+import { BellScheduleButton } from '@/components/timetable/bell-schedule'
 import { Page } from '@/components/layout/page'
 import { useOptions } from '@/hooks/use-resource'
 import { ApiError, api } from '@/lib/api'
@@ -104,6 +105,7 @@ export default function TimetablePage() {
       subtitle="Weekly schedule per section"
       actions={
         <div className="flex flex-wrap gap-2">
+          {can('timetable:update') && <BellScheduleButton periods={periods ?? []} />}
           <Select
             aria-label="Class"
             value={classId}
@@ -139,6 +141,9 @@ export default function TimetablePage() {
             icon="calendar-clock"
             title="No periods defined"
             description="Set up the daily bell schedule before building a timetable."
+            action={
+              can('timetable:update') ? <BellScheduleButton periods={[]} /> : undefined
+            }
           />
         ) : !sectionId ? (
           <EmptyState icon="layers" title="Create a section first" />
