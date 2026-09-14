@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo } from 'react'
+import { useEffect, useMemo, useRef } from 'react'
 import { addDays, differenceInCalendarDays, format, parseISO, startOfWeek } from 'date-fns'
 import { cn } from '@/lib/utils'
 
@@ -24,13 +24,22 @@ const WEEKDAY_LABELS = ['Mon', '', 'Wed', '', 'Fri', '', '']
  * Weeks run down the columns the way a wall planner does, so a pattern shows up
  * as a horizontal band rather than something you have to count out.
  */
-export function AttendanceCalendar({ days, weeks = 53 }: { days: Day[]; weeks?: number }) {
+export function AttendanceCalendar({ days, maxWeeks = 53 }: { days: Day[]; maxWeeks?: number }) {
+  const scroller = useRef<HTMLDivElement>(null)
+
   const { columns, months } = useMemo(() => {
     const byDate = new Map(days.map((d) => [d.date, d]))
     // Anchor on the most recent marked day rather than today, so a register
     // that stopped in March does not render as a wall of empty squares.
     const last = days.length ? parseISO(days[days.length - 1].date) : new Date()
     const end = startOfWeek(last, { weekStartsOn: 1 })
+
+    // Size the window to the data, so a school four weeks into term does not
+    // get a year of empty squares — but never more than a year, and never so
+    // few that the shape of a term is lost.
+    const first = days.length ? parseISO(days[0].date) : last
+    const span = Math.ceil((differenceInCalendarDays(end, startOfWeek(first, { weekStartsOn: 1 })) + 1) / 7)
+    const weeks = Math.min(maxWeeks, Math.max(12, span))
     const start = addDays(end, -7 * (weeks - 1))
 
     const columns: (Day | null)[][] = []
@@ -56,13 +65,19 @@ export function AttendanceCalendar({ days, weeks = 53 }: { days: Day[]; weeks?: 
       columns.push(column)
     }
     return { columns, months }
-  }, [days, weeks])
+  }, [days, maxWeeks])
+
+  // The interesting end is the recent one, so start scrolled to it.
+  useEffect(() => {
+    const element = scroller.current
+    if (element) element.scrollLeft = element.scrollWidth
+  }, [columns])
 
   const present = days.filter((d) => ['present', 'late', 'half_day'].includes(d.status)).length
 
   return (
     <div className="space-y-3">
-      <div className="overflow-x-auto pb-1">
+      <div ref={scroller} className="overflow-x-auto pb-1">
         <div className="inline-block min-w-full">
           <div className="flex gap-[3px] pl-8 text-[11px] font-semibold text-muted">
             {columns.map((_, week) => {

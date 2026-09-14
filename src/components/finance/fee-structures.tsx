@@ -134,17 +134,22 @@ export function FeeStructuresScreen({ prefix }: { prefix?: React.ReactNode }) {
                   </span>
                 }
                 subtitle={
-                  (structure.class_ids ?? [])
-                    .map((id: string) => classNames.get(id))
-                    .filter(Boolean)
-                    .join(', ') || 'No classes assigned'
+                  <span className="flex flex-wrap items-center gap-x-2">
+                    <span className="tabular font-bold text-ink">
+                      {money(structure.annual_total ?? annualTotal(structure.components ?? []))}
+                      <span className="ml-1 text-[11.5px] font-semibold text-muted">a year</span>
+                    </span>
+                    <span aria-hidden>·</span>
+                    <span className="truncate">
+                      {(structure.class_ids ?? [])
+                        .map((id: string) => classNames.get(id))
+                        .filter(Boolean)
+                        .join(', ') || 'No classes assigned'}
+                    </span>
+                  </span>
                 }
                 action={
                   <div className="flex items-center gap-2">
-                    <span className="tabular text-[15px] font-extrabold text-ink">
-                      {money(structure.annual_total ?? annualTotal(structure.components ?? []))}
-                      <span className="ml-1 text-[11.5px] font-semibold text-muted">/yr</span>
-                    </span>
                     {canEdit && (
                       <div className="flex gap-1">
                         <Button size="sm" variant="secondary" onClick={() => setEditing(structure)}>
