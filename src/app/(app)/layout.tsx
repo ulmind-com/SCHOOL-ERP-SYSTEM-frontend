@@ -5,8 +5,8 @@ import { usePathname, useRouter } from 'next/navigation'
 import { ImpersonationBanner } from '@/components/layout/impersonation-banner'
 import { MenuProvider } from '@/components/layout/menu-context'
 import { Sidebar } from '@/components/layout/sidebar'
+import { FullPageLoader } from '@/components/ui/loader'
 import { useSession } from '@/lib/session'
-import { Logo } from '@/components/layout/logo'
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter()
@@ -61,12 +61,5 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
 
 function BootScreen() {
-  return (
-    <div className="grid min-h-dvh place-items-center">
-      <div className="flex flex-col items-center gap-4">
-        <Logo size={40} className="animate-pulse text-ink" />
-        <p className="text-[13px] font-semibold text-muted">Loading your workspace…</p>
-      </div>
-    </div>
-  )
+  return <FullPageLoader message="Loading your workspace…" />
 }

@@ -11,6 +11,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardBody, CardHeader } from '@/components/ui/card'
 import { DataTable } from '@/components/ui/table'
 import { EmptyState } from '@/components/ui/empty'
+import { Loader } from '@/components/ui/loader'
 import { Page } from '@/components/layout/page'
 import { StatCard } from '@/components/ui/stat-card'
 import { TabSwitcher } from '@/components/resource/tab-switcher'
@@ -48,8 +49,7 @@ export default function MyRecordPage() {
   if (isLoading) {
     return (
       <Page title="My Record">
-        <div className="skeleton h-[180px] rounded-card" />
-        <div className="skeleton h-[320px] rounded-card" />
+        <Loader message="Gathering everything…" />
       </Page>
     )
   }

@@ -24,6 +24,7 @@ import { Card, CardBody, CardHeader } from '@/components/ui/card'
 import { DataTable } from '@/components/ui/table'
 import { EmptyState } from '@/components/ui/empty'
 import { Select } from '@/components/ui/input'
+import { Loader } from '@/components/ui/loader'
 import { Page } from '@/components/layout/page'
 import { useDownload } from '@/hooks/use-download'
 import { useOptions } from '@/hooks/use-resource'
@@ -69,8 +70,7 @@ export default function StudentProfilePage({
   if (isLoading || !data) {
     return (
       <Page title="Student">
-        <div className="skeleton h-[200px] rounded-card" />
-        <div className="skeleton h-[340px] rounded-card" />
+        <Loader message="Fetching the record…" />
       </Page>
     )
   }

@@ -9,6 +9,7 @@ import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Card, CardBody, CardHeader } from '@/components/ui/card'
 import { Input, Select, Textarea } from '@/components/ui/input'
+import { Loader } from '@/components/ui/loader'
 import { Page } from '@/components/layout/page'
 import { useOptions } from '@/hooks/use-resource'
 import { ApiError, api } from '@/lib/api'
@@ -61,8 +62,7 @@ export default function EditStudentPage({ params }: { params: Promise<{ id: stri
   if (isLoading || !student) {
     return (
       <Page title="Edit student">
-        <div className="skeleton h-[220px] rounded-card" />
-        <div className="skeleton h-[220px] rounded-card" />
+        <Loader message="Fetching the record…" />
       </Page>
     )
   }
