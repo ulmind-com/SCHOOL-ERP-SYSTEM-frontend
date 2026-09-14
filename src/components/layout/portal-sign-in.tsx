@@ -4,34 +4,52 @@ import { Suspense, useState } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { ArrowRight, Building2, Lock, Mail } from 'lucide-react'
-import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { AuthShell as Shell } from '@/components/layout/auth-shell'
+import { AuthShell } from '@/components/layout/auth-shell'
 import { ApiError, api, tokens } from '@/lib/api'
 import { useSession } from '@/lib/session'
 import type { InstitutionChoice, LoginResponse } from '@/lib/types'
 
-export default function LoginPage() {
+export interface PortalCopy {
+  heading: string
+  intro: string
+  /** What to call the identifier, in their words. */
+  identifierLabel: string
+  identifierHint: string
+  /** Where this kind of account belongs once it is through the door. */
+  home: string
+  /** Shown under the form — what they will find inside. */
+  bullets: string[]
+}
+
+/**
+ * A sign-in door per audience.
+ *
+ * One set of credentials and one endpoint behind them — the role still decides
+ * what anyone sees. What changes is the wording: a parent arriving at "Welcome
+ * back · Sign in to your institution workspace" has no idea they are in the
+ * right place, and a school can hand out a link that plainly says so.
+ */
+export function PortalSignIn({ copy }: { copy: PortalCopy }) {
   return (
     <Suspense fallback={null}>
-      <LoginScreen />
+      <PortalSignInForm copy={copy} />
     </Suspense>
   )
 }
 
-function LoginScreen() {
+function PortalSignInForm({ copy }: { copy: PortalCopy }) {
   const router = useRouter()
   const params = useSearchParams()
   const applyLogin = useSession((state) => state.applyLogin)
 
-  const [email, setEmail] = useState(() => params.get('email') ?? '')
+  const [identifier, setIdentifier] = useState(() => params.get('email') ?? '')
   const [password, setPassword] = useState('')
   const [institution, setInstitution] = useState<string | null>(null)
   const [choices, setChoices] = useState<InstitutionChoice[]>([])
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
-  const [platformMode, setPlatformMode] = useState(false)
 
   const deploymentMode = process.env.NEXT_PUBLIC_DEPLOYMENT_MODE ?? 'saas'
 
@@ -40,26 +58,20 @@ function LoginScreen() {
     setError('')
     setLoading(true)
     try {
-      const path = platformMode ? '/auth/platform/login' : '/auth/login'
-      const response = await api.public.post<LoginResponse>(path, {
-        email,
+      const response = await api.public.post<LoginResponse>('/auth/login', {
+        email: identifier,
         password,
         institution,
       })
       await applyLogin(response)
       if (response.institution) tokens.setTenant(response.institution.slug)
-      const next = params.get('next')
-      // A family's home is their own record, not the staff dashboard.
-      const portalHome =
-        response.user.portal === 'student' || response.user.portal === 'parent'
-          ? '/portal/me'
-          : '/dashboard'
-      const home = platformMode ? '/platform' : next || portalHome
-      router.replace(response.must_change_password ? '/account/password?first=1' : home)
+      router.replace(
+        response.must_change_password
+          ? '/account/password?first=1'
+          : params.get('next') || copy.home,
+      )
     } catch (caught) {
       if (caught instanceof ApiError) {
-        // The API returns 409 with the list when one email belongs to several
-        // institutions — ask which, rather than guessing.
         if (caught.status === 409 && caught.meta.institutions) {
           setChoices(caught.meta.institutions as InstitutionChoice[])
           setError('')
@@ -76,12 +88,10 @@ function LoginScreen() {
 
   if (choices.length > 0) {
     return (
-      <Shell>
-        <h1 className="text-[26px] font-extrabold tracking-tight text-ink">
-          Which institution?
-        </h1>
+      <AuthShell>
+        <h1 className="text-[26px] font-extrabold tracking-tight text-ink">Which institution?</h1>
         <p className="mt-1.5 text-[14px] text-muted">
-          {email} has an account at more than one.
+          That account exists at more than one.
         </p>
         <ul className="mt-6 space-y-2">
           {choices.map((choice) => (
@@ -91,7 +101,6 @@ function LoginScreen() {
                 onClick={() => {
                   setInstitution(choice.slug)
                   setChoices([])
-                  toast.message(`Signing in to ${choice.name}`)
                 }}
                 className="flex w-full items-center gap-3 rounded-card border border-line bg-surface
                            p-4 text-left transition hover:border-ink/20 hover:bg-surface-sunken"
@@ -99,49 +108,32 @@ function LoginScreen() {
                 <span className="grid h-11 w-11 shrink-0 place-items-center rounded-field bg-lilac">
                   <Building2 className="h-5 w-5 text-ink" aria-hidden />
                 </span>
-                <span className="min-w-0 flex-1">
-                  <span className="block truncate text-[15px] font-bold text-ink">
-                    {choice.name}
-                  </span>
-                  <span className="block truncate text-[12.5px] capitalize text-muted">
-                    {choice.institution_type}
-                  </span>
+                <span className="min-w-0 flex-1 truncate text-[15px] font-bold text-ink">
+                  {choice.name}
                 </span>
                 <ArrowRight className="h-4 w-4 shrink-0 text-muted" aria-hidden />
               </button>
             </li>
           ))}
         </ul>
-        <button
-          type="button"
-          onClick={() => setChoices([])}
-          className="mt-5 text-[13px] font-semibold text-muted underline-offset-4 hover:underline"
-        >
-          Use a different email
-        </button>
-      </Shell>
+      </AuthShell>
     )
   }
 
   return (
-    <Shell>
-      <h1 className="text-[26px] font-extrabold tracking-tight text-ink">
-        {platformMode ? 'Platform console' : 'Welcome back'}
-      </h1>
-      <p className="mt-1.5 text-[14px] text-muted">
-        {platformMode
-          ? 'Sign in to manage institutions, plans and subscriptions.'
-          : 'Sign in to your institution workspace.'}
-      </p>
+    <AuthShell>
+      <h1 className="text-[26px] font-extrabold tracking-tight text-ink">{copy.heading}</h1>
+      <p className="mt-1.5 text-[14px] text-muted">{copy.intro}</p>
 
       <form onSubmit={submit} className="mt-7 space-y-4">
         <Input
-          label="Email or phone"
+          label={copy.identifierLabel}
           autoComplete="username"
           required
-          value={email}
-          onChange={(event) => setEmail(event.target.value)}
-          placeholder="you@institution.edu or 98765 43210"
+          value={identifier}
+          onChange={(event) => setIdentifier(event.target.value)}
+          placeholder="you@example.com or 98765 43210"
+          hint={copy.identifierHint}
           leading={<Mail className="h-4 w-4" aria-hidden />}
         />
         <Input
@@ -154,11 +146,10 @@ function LoginScreen() {
           placeholder="••••••••"
           leading={<Lock className="h-4 w-4" aria-hidden />}
         />
-
-        {!platformMode && deploymentMode === 'saas' && (
+        {deploymentMode === 'saas' && (
           <Input
-            label="Institution"
-            hint="Leave blank unless your email is registered at more than one."
+            label="School or college"
+            hint="Only needed if you are registered at more than one."
             value={institution ?? ''}
             onChange={(event) => setInstitution(event.target.value || null)}
             placeholder="greenfield-public-school"
@@ -181,22 +172,14 @@ function LoginScreen() {
         </Button>
       </form>
 
-      {!platformMode && (
-        <div className="mt-6 rounded-card bg-surface-sunken px-4 py-3.5">
-          <p className="text-[12.5px] font-semibold text-muted">Looking for your own account?</p>
-          <div className="mt-1.5 flex flex-wrap gap-x-4 gap-y-1 text-[13px]">
-            <Link href="/student" className="font-semibold text-ink underline-offset-4 hover:underline">
-              Student sign-in
-            </Link>
-            <Link href="/parent" className="font-semibold text-ink underline-offset-4 hover:underline">
-              Parent sign-in
-            </Link>
-            <Link href="/teacher" className="font-semibold text-ink underline-offset-4 hover:underline">
-              Teacher sign-in
-            </Link>
-          </div>
-        </div>
-      )}
+      <ul className="mt-6 space-y-1.5">
+        {copy.bullets.map((line) => (
+          <li key={line} className="flex items-start gap-2 text-[13px] text-muted">
+            <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-butter" aria-hidden />
+            {line}
+          </li>
+        ))}
+      </ul>
 
       <div className="mt-6 flex flex-wrap items-center justify-between gap-3 text-[13px]">
         <Link
@@ -205,19 +188,13 @@ function LoginScreen() {
         >
           Forgot password?
         </Link>
-        {deploymentMode === 'saas' && (
-          <button
-            type="button"
-            onClick={() => {
-              setPlatformMode((mode) => !mode)
-              setError('')
-            }}
-            className="font-semibold text-muted underline-offset-4 hover:underline"
-          >
-            {platformMode ? 'Institution sign-in' : 'Platform sign-in'}
-          </button>
-        )}
+        <Link
+          href="/login"
+          className="font-semibold text-muted underline-offset-4 hover:underline"
+        >
+          Institution sign-in
+        </Link>
       </div>
-    </Shell>
+    </AuthShell>
   )
 }

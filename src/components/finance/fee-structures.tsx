@@ -255,9 +255,14 @@ function StructureEditor({
   const { data: heads } = useOptions('/fee-heads')
   const { data: classes } = useOptions('/classes')
   const { data: years } = useOptions('/academic-years')
+  const { data: programs } = useOptions('/programs')
+  const { data: departments } = useOptions('/departments')
 
   const [components, setComponents] = useState<Component[]>([])
   const [classIds, setClassIds] = useState<string[]>([])
+  const [programIds, setProgramIds] = useState<string[]>([])
+  const [departmentIds, setDepartmentIds] = useState<string[]>([])
+  const [semesters, setSemesters] = useState<number[]>([])
   const [formKey, setFormKey] = useState(0)
   const [seededFor, setSeededFor] = useState<string | null>(null)
 
@@ -266,6 +271,11 @@ function StructureEditor({
     setSeededFor(openedFor)
     setComponents((structure.components ?? []).map((c: Component) => ({ ...c })))
     setClassIds(structure.class_ids ?? [])
+    setProgramIds(
+      structure.program_ids ?? (structure.program_id ? [structure.program_id] : []),
+    )
+    setDepartmentIds(structure.department_ids ?? [])
+    setSemesters(structure.semesters ?? [])
     setFormKey((key) => key + 1)
   }
   if (!openedFor && seededFor) setSeededFor(null)
@@ -305,6 +315,9 @@ function StructureEditor({
             name: String(form.get('name') ?? ''),
             academic_year_id: String(form.get('academic_year_id') ?? ''),
             class_ids: classIds,
+            program_ids: programIds,
+            department_ids: departmentIds,
+            semesters,
             late_fee_per_day: Number(form.get('late_fee_per_day')) || 0,
             late_fee_grace_days: Number(form.get('late_fee_grace_days')) || 0,
             max_late_fee: Number(form.get('max_late_fee')) || 0,
@@ -344,31 +357,80 @@ function StructureEditor({
           </Select>
         </div>
 
-        <div>
-          <p className="mb-2 text-[13px] font-bold text-ink">Applies to</p>
-          <div className="flex flex-wrap gap-2">
-            {(classes ?? []).map((option: any) => {
-              const on = classIds.includes(option.id)
-              return (
-                <button
-                  key={option.id}
-                  type="button"
-                  aria-pressed={on}
-                  onClick={() =>
-                    setClassIds((prev) =>
-                      on ? prev.filter((id) => id !== option.id) : [...prev, option.id],
-                    )
-                  }
-                  className={
-                    on
-                      ? 'rounded-pill bg-ink px-3.5 py-1.5 text-[13px] font-semibold text-white'
-                      : 'rounded-pill bg-surface-sunken px-3.5 py-1.5 text-[13px] font-semibold text-ink-soft transition hover:bg-ink/[0.07]'
-                  }
-                >
-                  {option.name}
-                </button>
+        <div className="space-y-3">
+          <div>
+            <p className="text-[13px] font-bold text-ink">Applies to</p>
+            <p className="mt-0.5 text-[12.5px] text-muted">
+              A school bills by class, a college by programme or department. Any match is
+              enough — leave everything blank and it covers every student.
+            </p>
+          </div>
+
+          <Picker
+            label="Classes"
+            options={classes}
+            selected={classIds}
+            onToggle={(id) =>
+              setClassIds((prev) =>
+                prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id],
               )
-            })}
+            }
+          />
+          {(programs ?? []).length > 0 && (
+            <Picker
+              label="Programmes"
+              options={programs}
+              selected={programIds}
+              onToggle={(id) =>
+                setProgramIds((prev) =>
+                  prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id],
+                )
+              }
+            />
+          )}
+          {(departments ?? []).length > 0 && (
+            <Picker
+              label="Departments"
+              options={departments}
+              selected={departmentIds}
+              onToggle={(id) =>
+                setDepartmentIds((prev) =>
+                  prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id],
+                )
+              }
+            />
+          )}
+
+          <div>
+            <p className="mb-1.5 text-[12.5px] font-bold text-muted">Semesters</p>
+            <div className="flex flex-wrap gap-2">
+              {[1, 2, 3, 4, 5, 6, 7, 8].map((number) => {
+                const on = semesters.includes(number)
+                return (
+                  <button
+                    key={number}
+                    type="button"
+                    aria-pressed={on}
+                    onClick={() =>
+                      setSemesters((prev) =>
+                        on ? prev.filter((x) => x !== number) : [...prev, number],
+                      )
+                    }
+                    className={
+                      on
+                        ? 'tabular rounded-pill bg-ink px-3.5 py-1.5 text-[13px] font-semibold text-white'
+                        : 'tabular rounded-pill bg-surface-sunken px-3.5 py-1.5 text-[13px] font-semibold text-ink-soft transition hover:bg-ink/[0.07]'
+                    }
+                  >
+                    {number}
+                  </button>
+                )
+              })}
+            </div>
+            <p className="mt-1 text-[12px] text-muted">
+              Leave blank for every semester. Pick some when a course charges differently as it
+              progresses.
+            </p>
           </div>
         </div>
 
@@ -552,5 +614,45 @@ function StructureEditor({
         </div>
       </form>
     </Drawer>
+  )
+}
+
+/** A row of toggles over one option source. */
+function Picker({
+  label,
+  options,
+  selected,
+  onToggle,
+}: {
+  label: string
+  options: any[] | undefined
+  selected: string[]
+  onToggle: (id: string) => void
+}) {
+  if (!options?.length) return null
+  return (
+    <div>
+      <p className="mb-1.5 text-[12.5px] font-bold text-muted">{label}</p>
+      <div className="flex flex-wrap gap-2">
+        {options.map((option: any) => {
+          const on = selected.includes(option.id)
+          return (
+            <button
+              key={option.id}
+              type="button"
+              aria-pressed={on}
+              onClick={() => onToggle(option.id)}
+              className={
+                on
+                  ? 'rounded-pill bg-ink px-3.5 py-1.5 text-[13px] font-semibold text-white'
+                  : 'rounded-pill bg-surface-sunken px-3.5 py-1.5 text-[13px] font-semibold text-ink-soft transition hover:bg-ink/[0.07]'
+              }
+            >
+              {option.name}
+            </button>
+          )
+        })}
+      </div>
+    </div>
   )
 }

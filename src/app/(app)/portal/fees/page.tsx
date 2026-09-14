@@ -2,50 +2,56 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { format, parseISO } from 'date-fns'
-import { CreditCard, FileText, Receipt, ShieldCheck } from 'lucide-react'
+import { differenceInCalendarDays, format, parseISO } from 'date-fns'
+import { CalendarClock, CreditCard, FileText, Receipt, ShieldCheck } from 'lucide-react'
 import { toast } from 'sonner'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardBody, CardHeader } from '@/components/ui/card'
 import { DataTable } from '@/components/ui/table'
 import { EmptyState } from '@/components/ui/empty'
+import { Loader } from '@/components/ui/loader'
 import { Page } from '@/components/layout/page'
 import { StatCard } from '@/components/ui/stat-card'
 import { TabSwitcher } from '@/components/resource/tab-switcher'
 import { useDownload } from '@/hooks/use-download'
 import { ApiError, api } from '@/lib/api'
-import { money } from '@/lib/utils'
+import { cn, money } from '@/lib/utils'
 
 const CHECKOUT_SRC = 'https://checkout.razorpay.com/v1/checkout.js'
-const PAYABLE = ['issued', 'partially_paid', 'overdue']
+
+const CYCLE_LABEL: Record<string, string> = {
+  monthly: 'Monthly',
+  quarterly: 'Quarterly',
+  half_yearly: 'Half-yearly',
+  semester: 'Per semester',
+  yearly: 'Yearly',
+  one_time: 'One-time',
+}
+
+const STATUS_TONE: Record<string, string> = {
+  paid: 'border-success/25 bg-success/[0.04]',
+  overdue: 'border-danger/30 bg-danger/[0.04]',
+  partially_paid: 'border-warning/30 bg-warning/[0.05]',
+  due: 'border-ink/15 bg-surface',
+  scheduled: 'border-line bg-surface-sunken',
+}
 
 /**
- * What a family sees: their own bills, and a way to settle them.
+ * What a family owes, on the schedule their institution actually charges.
  *
- * The list is the same data the bursar's screen shows, narrowed to this family
- * by the API rather than by anything here — a student who opens the network tab
- * still only ever receives their own invoices.
+ * The instalments come from the fee structure rather than from invoices, so a
+ * student sees the whole year — a school's twelve months, a college's two
+ * semesters — including the ones the office has not raised yet. Only a raised
+ * instalment can be paid; the rest are there so nobody is surprised.
  */
 export default function PortalFeesPage() {
   const { download, pending } = useDownload()
-  // Not /students: a family holds invoices:read but not students:read, and has
-  // no business listing the roll to find its own name.
-  const account = useQuery({
-    queryKey: ['my-fee-account'],
-    queryFn: () => api.get<any>('/fees/my-account'),
-  })
-  const children: any[] = account.data?.students ?? []
-  const [studentId, setStudentId] = useState('')
+  const [index, setIndex] = useState(0)
 
-  useEffect(() => {
-    if (!studentId && children.length) setStudentId(children[0].id)
-  }, [children, studentId])
-
-  const ledger = useQuery({
-    queryKey: ['my-ledger', studentId],
-    enabled: Boolean(studentId),
-    queryFn: () => api.get<any>(`/fees/ledger/${studentId}`),
+  const { data, isLoading } = useQuery({
+    queryKey: ['portal-fees'],
+    queryFn: () => api.get<any>('/portal/fees'),
   })
 
   const gateway = useQuery({
@@ -53,20 +59,36 @@ export default function PortalFeesPage() {
     queryFn: () => api.get<any>('/payments/online/status'),
   })
 
-  const invoices: any[] = ledger.data?.invoices ?? []
-  const payments: any[] = ledger.data?.payments ?? []
-  const totals = ledger.data?.totals ?? { billed: 0, paid: 0, outstanding: 0 }
+  const students: any[] = data?.students ?? []
+  const current = students[index]
+  const pay = usePayment(current?.student?.id)
 
-  const unpaid = useMemo(
-    () => invoices.filter((invoice) => PAYABLE.includes(invoice.status) && invoice.balance > 0),
-    [invoices],
-  )
-  const overdue = unpaid.filter((invoice) => invoice.status === 'overdue')
+  useEffect(() => {
+    if (index >= students.length) setIndex(0)
+  }, [index, students.length])
 
-  const pay = usePayment(studentId)
-  const child = (children ?? []).find((c: any) => c.id === studentId)
+  const instalments: any[] = current?.plan?.instalments ?? []
+  const totals = current?.plan?.totals ?? {}
+  const payments: any[] = current?.ledger?.payments ?? []
+  const nextDue = current?.plan?.next_due
 
-  if (!account.isLoading && children.length === 0) {
+  const cycles = useMemo<string[]>(() => {
+    const seen = new Set<string>()
+    for (const structure of current?.plan?.structures ?? []) {
+      for (const cycle of structure.cycles ?? []) seen.add(String(cycle))
+    }
+    return [...seen]
+  }, [current])
+
+  if (isLoading) {
+    return (
+      <Page title="Fees & Payments">
+        <Loader message="Working out what you owe…" />
+      </Page>
+    )
+  }
+
+  if (!current) {
     return (
       <Page title="Fees & Payments">
         <Card>
@@ -85,63 +107,75 @@ export default function PortalFeesPage() {
   return (
     <Page
       title="Fees & Payments"
-      subtitle={
-        child
-          ? [child.full_name, child.class_name, child.admission_number]
-              .filter(Boolean)
-              .join(' · ')
-          : 'Your fee account'
-      }
+      subtitle={[
+        current.student.full_name,
+        current.plan.academic_year,
+        cycles.length ? cycles.map((c: string) => CYCLE_LABEL[c] ?? c).join(' + ') : null,
+      ]
+        .filter(Boolean)
+        .join(' · ')}
       actions={
-        unpaid.length > 0 && gateway.data?.enabled ? (
+        nextDue && gateway.data?.enabled ? (
           <Button
             size="lg"
             loading={pay.isPending}
-            onClick={() => pay.mutate({ amount: totals.outstanding })}
+            onClick={() => pay.mutate({ invoiceId: nextDue.invoice_id })}
           >
             <CreditCard className="h-4 w-4" aria-hidden />
-            Pay {money(totals.outstanding)}
+            Pay {money(nextDue.balance)}
           </Button>
         ) : undefined
       }
     >
-      {/* A parent with more than one child picks between them. */}
-      {children.length > 1 && (
+      {students.length > 1 && (
         <TabSwitcher
-          tabs={children.map((c: any) => c.full_name)}
-          active={child?.full_name ?? ''}
+          tabs={students.map((s: any) => s.student.full_name)}
+          active={current.student.full_name}
           onChange={(name) =>
-            setStudentId(children.find((c: any) => c.full_name === name)?.id ?? '')
+            setIndex(students.findIndex((s: any) => s.student.full_name === name))
           }
         />
       )}
 
-      <div className="grid gap-4 sm:grid-cols-3">
-        <StatCard tone="lilac" icon="receipt" label="Billed" value={money(totals.billed)} />
-        <StatCard tone="mint" icon="wallet" label="Paid" value={money(totals.paid)} />
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard
-          tone={totals.outstanding > 0 ? 'blush' : 'mint'}
-          icon="triangle-alert"
-          label="Outstanding"
-          value={money(totals.outstanding)}
+          tone={totals.due_now > 0 ? 'blush' : 'mint'}
+          icon="wallet"
+          label="Due now"
+          value={money(totals.due_now ?? 0)}
           caption={
-            overdue.length
-              ? `${overdue.length} invoice(s) past their due date`
-              : unpaid.length
-                ? `${unpaid.length} invoice(s) awaiting payment`
-                : 'Nothing due — thank you'
+            totals.overdue > 0
+              ? `${money(totals.overdue)} of it is past its date`
+              : totals.due_now > 0
+                ? 'Raised and awaiting payment'
+                : 'Nothing outstanding — thank you'
           }
+        />
+        <StatCard tone="mint" icon="receipt" label="Paid so far" value={money(totals.paid ?? 0)} />
+        <StatCard
+          tone="lilac"
+          icon="calendar-clock"
+          label="Still to come"
+          value={money(totals.not_yet_raised ?? 0)}
+          caption="Scheduled but not yet billed"
+        />
+        <StatCard
+          tone="butter"
+          icon="file-text"
+          label="This year"
+          value={money(totals.year ?? 0)}
+          caption={current.plan.structures?.[0]?.name ?? 'Fee plan'}
         />
       </div>
 
-      {!gateway.data?.enabled && unpaid.length > 0 && (
+      {!gateway.data?.enabled && totals.due_now > 0 && (
         <Card>
           <CardBody className="flex items-start gap-3">
             <ShieldCheck className="mt-0.5 h-5 w-5 shrink-0 text-muted" aria-hidden />
             <div>
               <p className="text-[13.5px] font-bold text-ink">Online payment is not switched on</p>
               <p className="mt-0.5 text-[13px] text-muted">
-                Pay at the school office and the receipt will appear here. {gateway.data?.detail}
+                Pay at the school office and the receipt will appear here.
               </p>
             </div>
           </CardBody>
@@ -149,86 +183,39 @@ export default function PortalFeesPage() {
       )}
 
       <Card>
-        <CardHeader title="Invoices" subtitle="Newest first" />
-        <DataTable
-          columns={[
-            {
-              key: 'number',
-              header: 'Invoice',
-              cell: (row: any) => <span className="tabular font-bold text-ink">{row.number}</span>,
-            },
-            { key: 'period_label', header: 'Period', cell: (row: any) => row.period_label || '—' },
-            {
-              key: 'due_date',
-              header: 'Due',
-              cell: (row: any) =>
-                row.due_date ? format(parseISO(row.due_date), 'd MMM yyyy') : '—',
-            },
-            {
-              key: 'total',
-              header: 'Total',
-              align: 'right',
-              cell: (row: any) => money(row.total),
-            },
-            {
-              key: 'balance',
-              header: 'Balance',
-              align: 'right',
-              cell: (row: any) =>
-                row.balance > 0 ? (
-                  <span className="font-bold text-danger">{money(row.balance)}</span>
-                ) : (
-                  <span className="text-muted">Settled</span>
-                ),
-            },
-            {
-              key: 'status',
-              header: 'Status',
-              align: 'center',
-              cell: (row: any) => <Badge status={row.status} />,
-            },
-            {
-              key: '__actions',
-              header: '',
-              align: 'right',
-              cell: (row: any) => (
-                <div className="flex justify-end gap-1">
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    aria-label={`Download invoice ${row.number}`}
-                    loading={pending === `/print/invoice/${row.id}`}
-                    onClick={() =>
-                      download(`/print/invoice/${row.id}`, `invoice-${row.number}.pdf`, {
-                        open: true,
-                      })
-                    }
-                  >
-                    <FileText className="h-3.5 w-3.5" aria-hidden />
-                  </Button>
-                  {row.balance > 0 && gateway.data?.enabled && (
-                    <Button
-                      size="sm"
-                      loading={pay.isPending && pay.variables?.invoiceId === row.id}
-                      onClick={() => pay.mutate({ invoiceId: row.id })}
-                    >
-                      Pay {money(row.balance)}
-                    </Button>
-                  )}
-                </div>
-              ),
-            },
-          ]}
-          rows={invoices}
-          loading={ledger.isLoading}
-          empty={
-            <EmptyState
-              icon="file-text"
-              title="No invoices yet"
-              description="Fee invoices will appear here as the school raises them."
-            />
-          }
+        <CardHeader
+          title="Your instalments"
+          subtitle="Every payment this year, in the order they fall due"
         />
+        <CardBody className="pt-2">
+          {instalments.length === 0 ? (
+            <EmptyState
+              icon="wallet"
+              title="No fee plan set up yet"
+              description="Once the school assigns a fee structure to your class, the whole year appears here."
+            />
+          ) : (
+            <ol className="space-y-2">
+              {instalments.map((item: any) => (
+                <Instalment
+                  key={`${item.cycle}-${item.period_label}`}
+                  item={item}
+                  canPay={Boolean(gateway.data?.enabled)}
+                  paying={pay.isPending && pay.variables?.invoiceId === item.invoice_id}
+                  onPay={() => pay.mutate({ invoiceId: item.invoice_id })}
+                  downloading={pending === `/print/invoice/${item.invoice_id}`}
+                  onDownload={() =>
+                    download(
+                      `/print/invoice/${item.invoice_id}`,
+                      `invoice-${item.invoice_number}.pdf`,
+                      { open: true },
+                    )
+                  }
+                />
+              ))}
+            </ol>
+          )}
+        </CardBody>
       </Card>
 
       <Card>
@@ -265,8 +252,7 @@ export default function PortalFeesPage() {
               cell: (row: any) => (
                 <Button
                   size="sm"
-                  variant="ghost"
-                  aria-label={`Download receipt ${row.receipt_number}`}
+                  variant="secondary"
                   loading={pending === `/print/receipt/${row.id}`}
                   onClick={() =>
                     download(`/print/receipt/${row.id}`, `receipt-${row.receipt_number}.pdf`, {
@@ -275,6 +261,7 @@ export default function PortalFeesPage() {
                   }
                 >
                   <Receipt className="h-3.5 w-3.5" aria-hidden />
+                  PDF
                 </Button>
               ),
             },
@@ -284,7 +271,7 @@ export default function PortalFeesPage() {
             <EmptyState
               icon="wallet"
               title="No payments yet"
-              description="Receipts are issued automatically the moment a payment is recorded."
+              description="A receipt is issued the moment a payment is recorded."
             />
           }
         />
@@ -293,18 +280,101 @@ export default function PortalFeesPage() {
   )
 }
 
+function Instalment({
+  item,
+  canPay,
+  paying,
+  onPay,
+  downloading,
+  onDownload,
+}: {
+  item: any
+  canPay: boolean
+  paying: boolean
+  onPay: () => void
+  downloading: boolean
+  onDownload: () => void
+}) {
+  const due = parseISO(item.due_date)
+  const days = differenceInCalendarDays(due, new Date())
+  const when =
+    item.status === 'paid'
+      ? 'Settled'
+      : days < 0
+        ? `${Math.abs(days)} day${Math.abs(days) === 1 ? '' : 's'} overdue`
+        : days === 0
+          ? 'Due today'
+          : `in ${days} day${days === 1 ? '' : 's'}`
+
+  return (
+    <li
+      className={cn(
+        'flex flex-wrap items-center gap-x-4 gap-y-3 rounded-card border px-4 py-3',
+        STATUS_TONE[item.status] ?? STATUS_TONE.due,
+      )}
+    >
+      <div className="min-w-[160px] flex-1">
+        <p className="text-[14px] font-bold text-ink">{item.period_label}</p>
+        <p className="mt-0.5 flex flex-wrap items-center gap-x-2 text-[12.5px] text-muted">
+          <CalendarClock className="h-3.5 w-3.5" aria-hidden />
+          {format(due, 'd MMM yyyy')}
+          <span aria-hidden>·</span>
+          {when}
+          {item.lines?.length > 1 && (
+            <>
+              <span aria-hidden>·</span>
+              {item.lines.map((line: any) => line.description).join(', ')}
+            </>
+          )}
+        </p>
+      </div>
+
+      <div className="text-right">
+        <p className="tabular text-[15px] font-extrabold text-ink">{money(item.amount)}</p>
+        {item.paid > 0 && item.balance > 0 && (
+          <p className="tabular text-[12px] text-muted">{money(item.paid)} paid</p>
+        )}
+      </div>
+
+      <StatusChip status={item.status} />
+
+      <div className="flex gap-2">
+        {item.raised && (
+          <Button size="sm" variant="secondary" loading={downloading} onClick={onDownload}>
+            <FileText className="h-3.5 w-3.5" aria-hidden />
+            Bill
+          </Button>
+        )}
+        {item.raised && item.balance > 0 && canPay && (
+          <Button size="sm" loading={paying} onClick={onPay}>
+            Pay {money(item.balance)}
+          </Button>
+        )}
+      </div>
+    </li>
+  )
+}
+
+function StatusChip({ status }: { status: string }) {
+  if (status === 'paid') return <Badge tone="success">Paid</Badge>
+  if (status === 'overdue') return <Badge tone="danger">Overdue</Badge>
+  if (status === 'partially_paid') return <Badge tone="warning">Part paid</Badge>
+  if (status === 'due') return <Badge tone="neutral">Due</Badge>
+  // Not billed yet — nothing to act on, so it should not look like a demand.
+  return <Badge tone="neutral">Scheduled</Badge>
+}
+
 /**
  * Opens the gateway's own checkout and confirms the result with the API.
  *
  * The amount is never sent from here — the server reads it off the invoice — so
- * nothing the browser does can change what is charged. A webhook settles the
- * case where the payer closes the tab before the callback fires.
+ * nothing the browser does can change what is charged.
  */
-function usePayment(studentId: string) {
+function usePayment(studentId?: string) {
   const client = useQueryClient()
 
   return useMutation({
-    mutationFn: async ({ invoiceId }: { invoiceId?: string; amount?: number }) => {
+    mutationFn: async ({ invoiceId }: { invoiceId?: string }) => {
       await loadCheckout()
       const order = await api.post<any>('/payments/online/orders', {
         invoice_id: invoiceId ?? null,
@@ -318,9 +388,7 @@ function usePayment(studentId: string) {
           amount: order.amount_paise,
           currency: order.currency,
           name: order.student_name,
-          description: order.invoice_number
-            ? `Invoice ${order.invoice_number}`
-            : 'Fee payment',
+          description: order.invoice_number ? `Invoice ${order.invoice_number}` : 'Fee payment',
           prefill: order.prefill,
           handler: (response: any) => {
             api
@@ -331,17 +399,14 @@ function usePayment(studentId: string) {
               })
               .then(resolve, reject)
           },
-          modal: {
-            ondismiss: () => reject(new Error('Payment cancelled')),
-          },
+          modal: { ondismiss: () => reject(new Error('Payment cancelled')) },
         })
         razorpay.open()
       })
     },
     onSuccess: (result) => {
       toast.success(result.detail ?? `Paid — receipt ${result.receipt_number}`)
-      void client.invalidateQueries({ queryKey: ['my-ledger'] })
-      void client.invalidateQueries({ queryKey: ['my-fee-account'] })
+      void client.invalidateQueries({ queryKey: ['portal-fees'] })
     },
     onError: (error) => {
       if (error instanceof Error && error.message === 'Payment cancelled') return
