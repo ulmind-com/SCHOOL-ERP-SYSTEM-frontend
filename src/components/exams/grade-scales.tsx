@@ -108,18 +108,20 @@ export function GradeScalesScreen({ prefix }: { prefix?: React.ReactNode }) {
           {scales.map((scale: any) => (
             <Card key={scale.id}>
               <CardHeader
-                title={
-                  <span className="flex items-center gap-2">
-                    {scale.name}
+                title={scale.name}
+                subtitle={
+                  <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
                     {scale.is_default && (
                       <Badge tone="neutral">
                         <Star className="h-3 w-3" aria-hidden />
                         Default
                       </Badge>
                     )}
+                    <span>
+                      Pass at {scale.pass_percentage}% · {scale.bands?.length ?? 0} band(s)
+                    </span>
                   </span>
                 }
-                subtitle={`Pass at ${scale.pass_percentage}% · ${scale.bands?.length ?? 0} band(s)`}
                 action={
                   canEdit ? (
                     <div className="flex gap-1">
