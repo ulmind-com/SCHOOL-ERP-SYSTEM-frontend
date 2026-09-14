@@ -27,7 +27,35 @@ npm run build        # writes to .next-build, not .next
 
 > `next build` uses a separate output directory on purpose. Building into
 > `.next` while `next dev` is running overwrites the chunks the dev server is
-> serving, and every page 404s until it is restarted.
+> serving, and every page 404s until it is restarted. `vercel.json` sets
+> `outputDirectory` to match.
+
+---
+
+## Deploying (Vercel)
+
+The API deploys separately to Render. Deploy **the API first** — this app needs
+its URL at build time.
+
+1. **Vercel → Add New → Project →** import this repository. The framework is
+   detected automatically; `vercel.json` supplies the rest.
+2. **Environment Variables**, for *Production*, *Preview* and *Development*:
+
+   | Key | Value |
+   |---|---|
+   | `NEXT_PUBLIC_API_URL` | the Render API's URL, no trailing slash |
+   | `NEXT_PUBLIC_APP_NAME` | `Scholarly` |
+   | `NEXT_PUBLIC_DEPLOYMENT_MODE` | `saas` |
+   | `NEXT_PUBLIC_IMAGEKIT_URL_ENDPOINT` | `https://ik.imagekit.io/<your id>` |
+
+3. **Deploy**, then add the resulting URL to the API's `CORS_ORIGINS`. Until you
+   do, every request from the browser is blocked.
+
+> `NEXT_PUBLIC_*` values are inlined at build time, not read at runtime.
+> Changing one needs a **redeploy** — a restart will not pick it up.
+
+`regions: ["bom1"]` puts the serverless functions in Mumbai, next to the
+database. Move it if your Atlas cluster lives elsewhere.
 
 ---
 
