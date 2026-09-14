@@ -20,6 +20,10 @@ export default function LottiePlayer({ size }: { size: number }) {
       src={animation}
       loop
       autoplay
+      // The six books fly in one at a time and the last arrives at frame 31, so
+      // a loop from zero opens on an empty stage. Most waits are over in under
+      // a second, which would make that empty stage the only thing anyone sees.
+      segment={[20, 120]}
       // The source is 126 × 200 and an animation fills whatever box it is given,
       // so height leads and width follows to keep it from stretching.
       style={{ height: size, width: (size * 126) / 200 }}
