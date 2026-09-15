@@ -1,9 +1,10 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useState } from 'react'
+import dynamic from 'next/dynamic'
 import { useQuery } from '@tanstack/react-query'
 import { format, formatDistanceToNowStrict, parseISO } from 'date-fns'
-import { Gauge, MapPin, Navigation, Route as RouteIcon } from 'lucide-react'
+import { Gauge, MapPin, Route as RouteIcon } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardBody, CardHeader } from '@/components/ui/card'
 import { EmptyState } from '@/components/ui/empty'
@@ -15,6 +16,8 @@ interface LiveVehicle {
   trip_id: string
   vehicle_number: string
   route: string
+  route_id: string | null
+  vehicle_type?: string
   direction: string
   driver: string
   latitude: number | null
@@ -34,6 +37,19 @@ const SIGNAL_TONE = {
   lost: 'danger',
   'no-fix': 'neutral',
 } as const
+
+/**
+ * Leaflet touches `window` on import, so it can never be part of the server
+ * bundle. Isolating it in its own chunk also keeps it out of every other page.
+ */
+const LiveMap = dynamic(() => import('@/components/map/live-map').then((m) => m.LiveMap), {
+  ssr: false,
+  loading: () => (
+    <div className="grid h-[420px] place-items-center rounded-field bg-surface-sunken">
+      <p className="text-[13px] text-muted">Loading the map…</p>
+    </div>
+  ),
+})
 
 export default function TrackingPage() {
   const [selected, setSelected] = useState<string | null>(null)
@@ -56,6 +72,44 @@ export default function TrackingPage() {
     queryFn: () => api.get<any>(`/tracking/trips/${active!.trip_id}/path`),
     refetchInterval: 15_000,
   })
+
+  // The planned line and its stops — the half of the picture that does not
+  // move, and the half that is there before any bus has left the depot.
+  const shape = useQuery({
+    queryKey: ['route-shape', active?.route_id],
+    enabled: Boolean(active?.route_id),
+    staleTime: 10 * 60_000,
+    queryFn: () => api.get<any>(`/tracking/routes/${active!.route_id}/shape`),
+  })
+
+  const reached = new Set((active?.stops_reached ?? []).map((s) => s.stop_id))
+  const mapStops = (shape.data?.stops ?? [])
+    .filter((s: any) => s.lat != null && s.lng != null)
+    .map((s: any) => ({
+      id: s.id,
+      name: s.name,
+      lat: s.lat,
+      lng: s.lng,
+      order: s.order,
+      reached: reached.has(s.id),
+      caption: [s.pickup_time && `Pickup ${s.pickup_time}`, s.landmark]
+        .filter(Boolean)
+        .join(' · '),
+    }))
+
+  const mapVehicles = vehicles
+    .filter((v) => v.latitude != null && v.longitude != null)
+    .map((v) => ({
+      id: v.trip_id,
+      label: v.vehicle_number,
+      lat: v.latitude as number,
+      lng: v.longitude as number,
+      type: (v as any).vehicle_type ?? 'bus',
+      signal: v.signal,
+      caption: `${v.route || 'No route'} · ${v.speed_kmh.toFixed(0)} km/h${
+        v.driver ? ` · ${v.driver}` : ''
+      }`,
+    }))
 
   return (
     <Page
@@ -140,10 +194,10 @@ export default function TrackingPage() {
 
                 <Card>
                   <CardHeader
-                    title={`${active.vehicle_number} — recorded path`}
+                    title={`${active.vehicle_number} — on the map`}
                     subtitle={
                       path.data?.path?.length
-                        ? `${path.data.path.length} points since ${
+                        ? `${path.data.path.length} positions since ${
                             active.started_at
                               ? format(parseISO(active.started_at), 'h:mm a')
                               : '—'
@@ -151,8 +205,17 @@ export default function TrackingPage() {
                         : 'Waiting for the first position'
                     }
                   />
-                  <CardBody className="pt-2">
-                    <TrackMap points={path.data?.path ?? []} />
+                  <CardBody className="px-3 pt-2 sm:px-5">
+                    <LiveMap
+                      vehicles={mapVehicles}
+                      stops={mapStops}
+                      path={path.data?.path ?? []}
+                      height={440}
+                    />
+                    <p className="pt-2 text-[11.5px] text-muted">
+                      Dashed line and numbered pins are the planned route; the solid
+                      green line is where the vehicle has actually been today.
+                    </p>
                   </CardBody>
                 </Card>
 
@@ -210,92 +273,6 @@ function Stat({
         )}
       >
         {value}
-      </p>
-    </div>
-  )
-}
-
-/**
- * The recorded path, drawn as SVG against its own bounding box.
- *
- * A real basemap means an API key, a tile budget and a third-party script on
- * every page load. The shape of the route, its stops and the current position
- * are what a school office actually watches — so this draws exactly that, with
- * no key to manage and nothing to break when a quota runs out.
- */
-function TrackMap({ points }: { points: { lat: number; lng: number; speed: number }[] }) {
-  const geometry = useMemo(() => {
-    if (points.length < 2) return null
-    const lats = points.map((p) => p.lat)
-    const lngs = points.map((p) => p.lng)
-    const minLat = Math.min(...lats)
-    const maxLat = Math.max(...lats)
-    const minLng = Math.min(...lngs)
-    const maxLng = Math.max(...lngs)
-    // Keep a margin so the end markers are never clipped, and guard the
-    // degenerate case where a vehicle has not moved.
-    const spanLat = Math.max(maxLat - minLat, 0.0008)
-    const spanLng = Math.max(maxLng - minLng, 0.0008)
-    const project = (p: { lat: number; lng: number }) => ({
-      x: 6 + ((p.lng - minLng) / spanLng) * 88,
-      // SVG y grows downward; latitude grows upward.
-      y: 6 + ((maxLat - p.lat) / spanLat) * 88,
-    })
-    const projected = points.map(project)
-    return {
-      d: projected.map((p, i) => `${i === 0 ? 'M' : 'L'}${p.x.toFixed(2)},${p.y.toFixed(2)}`).join(' '),
-      start: projected[0],
-      end: projected[projected.length - 1],
-    }
-  }, [points])
-
-  if (!geometry) {
-    return (
-      <div className="grid h-[280px] place-items-center rounded-field bg-surface-sunken">
-        <div className="text-center">
-          <Navigation className="mx-auto h-6 w-6 text-muted" aria-hidden />
-          <p className="mt-2 text-[13px] text-muted">
-            {points.length === 1 ? 'Waiting for the vehicle to move' : 'No positions yet'}
-          </p>
-        </div>
-      </div>
-    )
-  }
-
-  return (
-    <div className="overflow-hidden rounded-field bg-surface-sunken">
-      <svg
-        viewBox="0 0 100 100"
-        preserveAspectRatio="none"
-        className="h-[280px] w-full"
-        role="img"
-        aria-label={`Route path with ${points.length} recorded positions`}
-      >
-        <defs>
-          <pattern id="grid" width="10" height="10" patternUnits="userSpaceOnUse">
-            <path d="M10 0 L0 0 0 10" fill="none" stroke="rgb(234 236 239)" strokeWidth="0.4" />
-          </pattern>
-        </defs>
-        <rect width="100" height="100" fill="url(#grid)" />
-        <path
-          d={geometry.d}
-          fill="none"
-          stroke="rgb(17 18 20)"
-          strokeWidth="1.4"
-          strokeLinejoin="round"
-          strokeLinecap="round"
-          vectorEffect="non-scaling-stroke"
-        />
-        <circle cx={geometry.start.x} cy={geometry.start.y} r="1.8" fill="rgb(140 144 150)" />
-        <circle cx={geometry.end.x} cy={geometry.end.y} r="2.6" fill="rgb(23 178 106)" />
-        <circle cx={geometry.end.x} cy={geometry.end.y} r="4.5" fill="rgb(23 178 106)"
-                opacity="0.25">
-          <animate attributeName="r" values="3;6;3" dur="2s" repeatCount="indefinite" />
-          <animate attributeName="opacity" values="0.35;0;0.35" dur="2s" repeatCount="indefinite" />
-        </circle>
-      </svg>
-      <p className="px-3 pb-2 pt-1 text-[11.5px] text-muted">
-        Start · current position. Coordinates are recorded by the driver app.
       </p>
     </div>
   )

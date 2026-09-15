@@ -793,3 +793,155 @@ export const TEACHING: ResourceDef = {
     'A teacher only sees the sections they take. Add an allocation and their portal fills in.',
   invalidates: ['options'],
 }
+
+/** What Indian schools actually run, and what the live map draws. */
+const VEHICLE_TYPES = [
+  { value: 'bus', label: 'Bus' },
+  { value: 'mini_bus', label: 'Mini bus' },
+  { value: 'van', label: 'Van' },
+  { value: 'tempo', label: 'Tempo traveller' },
+  { value: 'car', label: 'Car' },
+  { value: 'auto', label: 'Auto' },
+]
+
+const VEHICLE_GLYPH: Record<string, string> = {
+  bus: '🚌',
+  mini_bus: '🚐',
+  van: '🚐',
+  tempo: '🚚',
+  car: '🚗',
+  auto: '🛺',
+}
+
+export const TRANSPORT_VEHICLES: ResourceDef = {
+  path: '/transport/vehicles',
+  module: 'transport',
+  title: 'Vehicles',
+  singular: 'Vehicle',
+  plural: 'Vehicles',
+  icon: 'bus',
+  defaultSort: 'registration_number',
+  searchPlaceholder: 'Search registration, model or driver',
+  invalidates: ['options'],
+  filters: [
+    { name: 'type', label: 'Type', options: VEHICLE_TYPES },
+    { name: 'status', label: 'Status', options: opts(['active', 'maintenance', 'retired']) },
+  ],
+  columns: [
+    {
+      key: 'registration_number',
+      header: 'Vehicle',
+      sortable: true,
+      cell: (r: any) => (
+        <span className="flex items-center gap-2.5">
+          <span aria-hidden className="text-[18px] leading-none">
+            {VEHICLE_GLYPH[r.type] ?? '🚌'}
+          </span>
+          <span className="min-w-0">
+            <span className="tabular block font-bold text-ink">{r.registration_number}</span>
+            {r.model && <span className="block text-[12px] text-muted">{r.model}</span>}
+          </span>
+        </span>
+      ),
+    },
+    {
+      key: 'type',
+      header: 'Type',
+      cell: (r: any) => (
+        <Badge tone="neutral">
+          {VEHICLE_TYPES.find((t) => t.value === r.type)?.label ?? titleCase(r.type ?? '')}
+        </Badge>
+      ),
+    },
+    { key: 'capacity', header: 'Seats', align: 'right', cell: (r: any) => r.capacity || '—' },
+    {
+      key: 'driver_name',
+      header: 'Driver',
+      cell: (r: any) => (
+        <span>
+          <span className="block text-[13px] font-semibold text-ink">
+            {r.driver_name || '—'}
+          </span>
+          {r.driver_phone && (
+            <span className="tabular block text-[12px] text-muted">{r.driver_phone}</span>
+          )}
+        </span>
+      ),
+    },
+    { key: 'status', header: 'Status', align: 'center', cell: (r: any) => <Badge status={r.status} /> },
+  ],
+  fields: [
+    { name: 'registration_number', label: 'Registration number', required: true, placeholder: 'WB 02 AB 1234' },
+    { name: 'type', label: 'Type', type: 'select', defaultValue: 'bus', options: VEHICLE_TYPES },
+    {
+      name: 'model',
+      label: 'Make and model',
+      placeholder: 'Tata Starbus',
+      hint: 'Free text — Tata Starbus, Ashok Leyland Lynx, Force Traveller, Mahindra Bolero…',
+    },
+    { name: 'capacity', label: 'Seats', type: 'number', defaultValue: 40 },
+    { name: 'driver_name', label: 'Driver', section: 'Crew' },
+    { name: 'driver_phone', label: 'Driver phone', type: 'tel', section: 'Crew' },
+    { name: 'driver_licence', label: 'Licence number', section: 'Crew' },
+    { name: 'attendant_name', label: 'Attendant', section: 'Crew' },
+    { name: 'attendant_phone', label: 'Attendant phone', type: 'tel', section: 'Crew' },
+    { name: 'insurance_expiry', label: 'Insurance expires', type: 'date', section: 'Papers' },
+    { name: 'fitness_expiry', label: 'Fitness expires', type: 'date', section: 'Papers' },
+    { name: 'permit_expiry', label: 'Permit expires', type: 'date', section: 'Papers' },
+    { name: 'gps_device_id', label: 'GPS device id', section: 'Papers', hint: 'Only if a dedicated tracker is fitted — the driver app needs none.' },
+    { name: 'status', label: 'Status', type: 'select', defaultValue: 'active', options: opts(['active', 'maintenance', 'retired']) },
+  ],
+  formWidth: 'lg',
+  emptyTitle: 'No vehicles yet',
+  emptyDescription: 'Add the buses and vans before drawing routes — a route names the vehicle that runs it.',
+}
+
+export const TRANSPORT_STOPS: ResourceDef = {
+  path: '/transport/stops',
+  module: 'transport',
+  title: 'Stops',
+  singular: 'Stop',
+  plural: 'Stops',
+  icon: 'map-pin',
+  defaultSort: 'order',
+  defaultSortDir: 'asc',
+  invalidates: ['options'],
+  filters: [
+    { name: 'route_id', label: 'Route', optionsFrom: '/transport/routes', optionLabel: (r: any) => r.name },
+  ],
+  columns: [
+    { key: 'order', header: '#', align: 'center', cell: (r: any) => <span className="tabular">{r.order ?? '—'}</span> },
+    { key: 'name', header: 'Stop', sortable: true, cell: (r: any) => strong(r.name) },
+    { key: 'landmark', header: 'Landmark', cell: (r: any) => r.landmark || '—' },
+    { key: 'pickup_time', header: 'Pickup', cell: (r: any) => r.pickup_time || '—' },
+    { key: 'drop_time', header: 'Drop', cell: (r: any) => r.drop_time || '—' },
+    {
+      key: 'latitude',
+      header: 'On the map',
+      align: 'center',
+      // A stop with no coordinates is invisible to the map and to a parent, so
+      // the register says so rather than leaving a blank cell.
+      cell: (r: any) =>
+        r.latitude != null && r.longitude != null ? (
+          <Badge tone="success">Placed</Badge>
+        ) : (
+          <Badge tone="warning">No location</Badge>
+        ),
+    },
+    { key: 'monthly_fare', header: 'Fare', align: 'right', cell: (r: any) => money(r.monthly_fare) },
+  ],
+  fields: [
+    { name: 'route_id', label: 'Route', type: 'remote-select', optionsFrom: '/transport/routes', optionLabel: (r: any) => r.name, required: true },
+    { name: 'name', label: 'Stop name', required: true },
+    { name: 'order', label: 'Position on the route', type: 'number', defaultValue: 1, hint: 'The order the bus reaches them in.' },
+    { name: 'landmark', label: 'Landmark', full: true },
+    { name: 'pickup_time', label: 'Pickup time', type: 'time' },
+    { name: 'drop_time', label: 'Drop time', type: 'time' },
+    { name: 'latitude', label: 'Latitude', type: 'number', hint: 'From any map app — long-press the spot and copy the numbers.' },
+    { name: 'longitude', label: 'Longitude', type: 'number' },
+    { name: 'monthly_fare', label: 'Monthly fare', type: 'number' },
+  ],
+  formWidth: 'lg',
+  emptyTitle: 'No stops on this route yet',
+  emptyDescription: 'Stops in order are what draws the route on the map and tells a parent when to be at the gate.',
+}

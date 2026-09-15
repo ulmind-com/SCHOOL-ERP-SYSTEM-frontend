@@ -125,3 +125,62 @@ body {
     transition-duration: 0.01ms !important;
   }
 }
+
+/* ── Live map markers ──────────────────────────────────────────────────── */
+.scholarly-vehicle .sv-wrap,
+.scholarly-stop .sv-stop {
+  display: grid;
+  place-items: center;
+}
+.scholarly-vehicle .sv-wrap {
+  position: relative;
+  width: 44px;
+  height: 44px;
+}
+.scholarly-vehicle .sv-dot {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  font-size: 18px;
+  line-height: 1;
+  background: #fff;
+  border: 2.5px solid var(--ring);
+  border-radius: 999px;
+  box-shadow: 0 4px 12px rgb(17 18 20 / 0.22);
+}
+/* The signal is on the marker, not only in the sidebar: a vehicle whose driver's
+   phone died must not sit on the map looking parked. */
+.scholarly-vehicle .sv-pulse {
+  position: absolute;
+  inset: 3px;
+  border-radius: 999px;
+  background: var(--ring);
+  opacity: 0.3;
+  animation: sv-ping 1.8s ease-out infinite;
+}
+@keyframes sv-ping {
+  0% { transform: scale(0.7); opacity: 0.45; }
+  100% { transform: scale(1.5); opacity: 0; }
+}
+.scholarly-stop .sv-stop {
+  width: 22px;
+  height: 22px;
+  font-size: 11px;
+  font-weight: 800;
+  border: 2px solid #fff;
+  border-radius: 999px;
+  box-shadow: 0 2px 6px rgb(17 18 20 / 0.2);
+}
+.leaflet-container {
+  font: inherit;
+  background: rgb(var(--surface-sunken));
+}
+.leaflet-tooltip {
+  font-size: 12.5px;
+  font-weight: 600;
+  border: none;
+  border-radius: 8px;
+  box-shadow: 0 4px 14px rgb(17 18 20 / 0.16);
+}
