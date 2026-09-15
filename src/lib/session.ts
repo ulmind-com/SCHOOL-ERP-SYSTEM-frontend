@@ -1,7 +1,7 @@
 'use client'
 
 import { create } from 'zustand'
-import { api, tokens } from './api'
+import { ApiError, api, tokens } from './api'
 import type { Institution, LoginResponse, NavGroup, SessionUser } from './types'
 
 interface MeResponse {
@@ -57,7 +57,15 @@ export const useSession = create<SessionState>((set, get) => ({
       })
       if (me.institution) tokens.setTenant(me.institution.slug)
       set({ viewingAs: tokens.impersonation()?.viewing ?? null })
-    } catch {
+    } catch (error) {
+      // Only an actual rejection ends the session. A dropped connection is not
+      // "you are signed out" — and switching academic year refetches the whole
+      // screen at once, which is exactly when a connection gets dropped.
+      const rejected = error instanceof ApiError && [401, 403].includes(error.status)
+      if (!rejected) {
+        set({ status: get().user ? 'ready' : 'anonymous' })
+        return
+      }
       tokens.clear()
       set({ user: null, institution: null, navigation: [], status: 'anonymous' })
     }

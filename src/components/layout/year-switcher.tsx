@@ -31,9 +31,11 @@ export function YearSwitcher() {
   const choose = async (id: string, current: boolean) => {
     tokens.setYear(current ? null : id)
     setOpen(false)
+    // Everything on screen was fetched for the old year. Refetch only what is
+    // mounted rather than every cached key — firing twenty requests at once is
+    // how one of them gets its connection dropped.
     await hydrate()
-    // Everything on screen was fetched for the old year.
-    await client.invalidateQueries()
+    await client.invalidateQueries({ refetchType: 'active' })
   }
 
   return (
