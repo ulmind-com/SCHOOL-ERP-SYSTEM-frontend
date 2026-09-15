@@ -37,7 +37,10 @@ export default function HomeworkPage() {
   })
 
   const items = data ?? []
-  const done = (item: any) => Boolean(item.submitted_at || item.status === 'graded')
+  // The API reports the submission under my_* — `status` on the row is the
+  // assignment's own state (draft, published), which is not what we mean here.
+  const done = (item: any) => item.my_status && item.my_status !== 'pending'
+  const graded = (item: any) => item.my_status === 'graded' 
 
   const shown = useMemo(() => {
     if (tab === 'Submitted') return items.filter(done)
@@ -45,9 +48,7 @@ export default function HomeworkPage() {
     return items
   }, [items, tab])
 
-  const overdue = items.filter(
-    (item) => !done(item) && item.due_date && parseISO(item.due_date) < new Date(),
-  )
+  const overdue = items.filter((item) => item.is_overdue)
 
   if (isLoading) {
     return (
@@ -77,7 +78,7 @@ export default function HomeworkPage() {
           tone="lilac"
           icon="trophy"
           label="Graded"
-          value={String(items.filter((i) => i.status === 'graded').length)}
+          value={String(items.filter(graded).length)}
         />
       </div>
 
@@ -103,7 +104,7 @@ export default function HomeworkPage() {
             <HomeworkCard
               key={item.id}
               item={item}
-              done={done(item)}
+              done={Boolean(done(item))}
               onAnswer={() => setAnswering(item)}
             />
           ))}
@@ -135,15 +136,15 @@ function HomeworkCard({
         subtitle={[item.subject_name, titleCase(item.type ?? '')].filter(Boolean).join(' · ')}
         action={
           <div className="flex items-center gap-3">
-            {item.status === 'graded' ? (
+            {item.my_status === 'graded' ? (
               <Badge tone="success">
-                {item.marks_obtained ?? '—'}
+                {item.my_marks ?? '—'}
                 {item.max_marks ? ` / ${item.max_marks}` : ''}
               </Badge>
             ) : done ? (
               <Badge tone="success">
                 <CheckCircle2 className="h-3 w-3" aria-hidden />
-                Handed in
+                {titleCase(item.my_status ?? 'submitted')}
               </Badge>
             ) : (
               <Button size="sm" onClick={onAnswer}>
@@ -180,10 +181,10 @@ function HomeworkCard({
             </>
           )}
         </p>
-        {item.feedback && (
+        {item.my_feedback && (
           <p className="mt-3 rounded-field bg-surface-sunken px-3.5 py-2.5 text-[13px] text-ink-soft">
             <span className="font-bold text-ink">Teacher&rsquo;s note: </span>
-            {item.feedback}
+            {item.my_feedback}
           </p>
         )}
       </CardBody>
@@ -196,7 +197,7 @@ function SubmitDrawer({ item, onClose }: { item: any; onClose: () => void }) {
 
   const submit = useMutation({
     mutationFn: (content: string) =>
-      api.post<any>('/homework/submit', { assignment_id: item.id, content }),
+      api.post<any>('/homework/submit', { assignment_id: item.id, text_answer: content }),
     onSuccess: (data) => {
       toast.success(data.detail ?? 'Handed in')
       void client.invalidateQueries({ queryKey: ['my-homework'] })
