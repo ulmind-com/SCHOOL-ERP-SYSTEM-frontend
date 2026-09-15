@@ -124,7 +124,17 @@ export function LiveMap({
     layers.current = L.layerGroup().addTo(instance)
     map.current = instance
 
+    // Leaflet measures its container once, at creation. Inside a card that is
+    // still laying out — or on a phone, where the column settles after the
+    // first paint — that measurement is wrong and the tile grid is built for a
+    // box that never existed, so the markers draw and the map stays grey.
+    const resize = new ResizeObserver(() => instance.invalidateSize())
+    resize.observe(host.current)
+    const settle = window.setTimeout(() => instance.invalidateSize(), 250)
+
     return () => {
+      resize.disconnect()
+      window.clearTimeout(settle)
       instance.remove()
       map.current = null
       markers.current.clear()
