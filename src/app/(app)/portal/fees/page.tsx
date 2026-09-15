@@ -146,9 +146,11 @@ export default function PortalFeesPage() {
           caption={
             totals.overdue > 0
               ? `${money(totals.overdue)} of it is past its date`
-              : totals.due_now > 0
-                ? 'Raised and awaiting payment'
-                : 'Nothing outstanding — thank you'
+              : totals.awaiting_window > 0
+                ? `${money(totals.awaiting_window)} more opens later`
+                : totals.due_now > 0
+                  ? 'Raised and awaiting payment'
+                  : 'Nothing outstanding — thank you'
           }
         />
         <StatCard tone="mint" icon="receipt" label="Paid so far" value={money(totals.paid ?? 0)} />
@@ -316,20 +318,48 @@ function Instalment({
         STATUS_TONE[item.status] ?? STATUS_TONE.due,
       )}
     >
-      <div className="min-w-[160px] flex-1">
+      <div className="min-w-[200px] flex-1">
         <p className="text-[14px] font-bold text-ink">{item.period_label}</p>
         <p className="mt-0.5 flex flex-wrap items-center gap-x-2 text-[12.5px] text-muted">
           <CalendarClock className="h-3.5 w-3.5" aria-hidden />
           {format(due, 'd MMM yyyy')}
           <span aria-hidden>·</span>
           {when}
-          {item.lines?.length > 1 && (
-            <>
-              <span aria-hidden>·</span>
-              {item.lines.map((line: any) => line.description).join(', ')}
-            </>
-          )}
         </p>
+
+        {/* What the money is for. "₹3,200" on its own tells a family nothing. */}
+        {item.lines?.length > 0 && (
+          <ul className="mt-2 space-y-0.5">
+            {item.lines.map((line: any, i: number) => (
+              <li
+                key={`${line.description}-${i}`}
+                className="flex flex-wrap items-baseline gap-x-2 text-[12.5px]"
+              >
+                <span className="font-semibold text-ink-soft">{line.description}</span>
+                {line.detail && <span className="text-muted">{line.detail}</span>}
+                {line.optional && <span className="text-muted">(optional)</span>}
+                <span className="tabular text-muted">{money(line.amount)}</span>
+              </li>
+            ))}
+          </ul>
+        )}
+
+        {item.opens_on && !item.payable && item.status === 'not_open_yet' && (
+          <p className="mt-1.5 text-[12px] font-semibold text-warning">
+            Payment opens {format(parseISO(item.opens_on), 'd MMM yyyy')}
+          </p>
+        )}
+        {item.closes_on && item.status === 'closed' && (
+          <p className="mt-1.5 text-[12px] font-semibold text-warning">
+            Online payment closed {format(parseISO(item.closes_on), 'd MMM yyyy')} — pay at the
+            office
+          </p>
+        )}
+        {item.payable && item.closes_on && (
+          <p className="mt-1.5 text-[12px] text-muted">
+            Pay online until {format(parseISO(item.closes_on), 'd MMM yyyy')}
+          </p>
+        )}
       </div>
 
       <div className="text-right">
@@ -348,7 +378,7 @@ function Instalment({
             Bill
           </Button>
         )}
-        {item.raised && item.balance > 0 && canPay && (
+        {item.payable && canPay && (
           <Button size="sm" loading={paying} onClick={onPay}>
             Pay {money(item.balance)}
           </Button>
@@ -363,6 +393,8 @@ function StatusChip({ status }: { status: string }) {
   if (status === 'overdue') return <Badge tone="danger">Overdue</Badge>
   if (status === 'partially_paid') return <Badge tone="warning">Part paid</Badge>
   if (status === 'due') return <Badge tone="neutral">Due</Badge>
+  if (status === 'not_open_yet') return <Badge tone="neutral">Opens later</Badge>
+  if (status === 'closed') return <Badge tone="warning">Pay at office</Badge>
   // Not billed yet — nothing to act on, so it should not look like a demand.
   return <Badge tone="neutral">Scheduled</Badge>
 }

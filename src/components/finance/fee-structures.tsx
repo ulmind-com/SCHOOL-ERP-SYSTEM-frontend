@@ -19,10 +19,15 @@ import { money } from '@/lib/utils'
 interface Component {
   fee_head_id: string
   fee_head_name: string
+  description: string
   amount: number
   frequency: string
   is_optional: boolean
   due_day: number
+  opens_days_before: number | null
+  closes_days_after: number | null
+  collect_from: string | null
+  collect_until: string | null
 }
 
 /**
@@ -326,10 +331,15 @@ function StructureEditor({
             components: components.map((c) => ({
               fee_head_id: c.fee_head_id,
               fee_head_name: c.fee_head_name,
+              description: c.description ?? '',
               amount: Number(c.amount) || 0,
               frequency: c.frequency,
               is_optional: Boolean(c.is_optional),
               due_day: Number(c.due_day) || 10,
+              opens_days_before: numberOrNull(c.opens_days_before),
+              closes_days_after: numberOrNull(c.closes_days_after),
+              collect_from: c.collect_from || null,
+              collect_until: c.collect_until || null,
             })),
           })
         }}
@@ -537,6 +547,23 @@ function StructureEditor({
                     a year
                   </span>
                 </div>
+
+                <div className="mt-2 border-t border-line pt-2">
+                  <Input
+                    aria-label={`What line ${index + 1} is for`}
+                    label="What this is for"
+                    value={component.description ?? ''}
+                    onChange={(event) =>
+                      setComponent(index, { description: event.target.value })
+                    }
+                    placeholder="Shown to the family on their instalment"
+                  />
+
+                  <CollectionWindow
+                    component={component}
+                    onChange={(patch) => setComponent(index, patch)}
+                  />
+                </div>
               </div>
             ))}
           </div>
@@ -552,10 +579,15 @@ function StructureEditor({
                 {
                   fee_head_id: '',
                   fee_head_name: '',
+                  description: '',
                   amount: 0,
                   frequency: 'monthly',
                   is_optional: false,
                   due_day: 10,
+                  opens_days_before: null,
+                  closes_days_after: null,
+                  collect_from: null,
+                  collect_until: null,
                 },
               ])
             }
@@ -653,6 +685,133 @@ function Picker({
           )
         })}
       </div>
+    </div>
+  )
+}
+
+function numberOrNull(value: unknown): number | null {
+  if (value === null || value === undefined || value === '') return null
+  const parsed = Number(value)
+  return Number.isNaN(parsed) ? null : parsed
+}
+
+/**
+ * When a charge can actually be paid.
+ *
+ * Most lines are open the moment they are billed and stay open until settled —
+ * that is what a tuition fee wants, and it is the default. A window is for the
+ * charges a school opens deliberately: an examination fee collected for the
+ * fortnight before the paper, and shut afterwards.
+ */
+function CollectionWindow({
+  component,
+  onChange,
+}: {
+  component: Component
+  onChange: (patch: Partial<Component>) => void
+}) {
+  const fixed = Boolean(component.collect_from || component.collect_until)
+  const relative =
+    component.opens_days_before !== null || component.closes_days_after !== null
+  const [mode, setMode] = useState<'always' | 'relative' | 'fixed'>(
+    fixed ? 'fixed' : relative ? 'relative' : 'always',
+  )
+
+  function choose(next: 'always' | 'relative' | 'fixed') {
+    setMode(next)
+    if (next === 'always') {
+      onChange({
+        opens_days_before: null,
+        closes_days_after: null,
+        collect_from: null,
+        collect_until: null,
+      })
+    } else if (next === 'relative') {
+      onChange({ collect_from: null, collect_until: null })
+    } else {
+      onChange({ opens_days_before: null, closes_days_after: null })
+    }
+  }
+
+  return (
+    <div className="mt-2">
+      <p className="mb-1.5 text-[12.5px] font-bold text-muted">When it can be paid</p>
+      <div className="flex flex-wrap gap-1.5">
+        {(
+          [
+            ['always', 'Whenever it is billed'],
+            ['relative', 'A window around the due date'],
+            ['fixed', 'Between two dates'],
+          ] as const
+        ).map(([value, label]) => (
+          <button
+            key={value}
+            type="button"
+            aria-pressed={mode === value}
+            onClick={() => choose(value)}
+            className={
+              mode === value
+                ? 'rounded-pill bg-ink px-3 py-1 text-[12.5px] font-semibold text-white'
+                : 'rounded-pill bg-surface-sunken px-3 py-1 text-[12.5px] font-semibold text-ink-soft transition hover:bg-ink/[0.07]'
+            }
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {mode === 'relative' && (
+        <div className="mt-2 grid gap-2 sm:grid-cols-2">
+          <Input
+            aria-label="Days before the due date that collection opens"
+            label="Opens (days before due)"
+            type="number"
+            min={0}
+            value={component.opens_days_before ?? ''}
+            onChange={(event) =>
+              onChange({ opens_days_before: numberOrNull(event.target.value) })
+            }
+            placeholder="Blank — open at once"
+          />
+          <Input
+            aria-label="Days after the due date that collection closes"
+            label="Closes (days after due)"
+            type="number"
+            min={0}
+            value={component.closes_days_after ?? ''}
+            onChange={(event) =>
+              onChange({ closes_days_after: numberOrNull(event.target.value) })
+            }
+            placeholder="Blank — never closes"
+          />
+        </div>
+      )}
+
+      {mode === 'fixed' && (
+        <div className="mt-2 grid gap-2 sm:grid-cols-2">
+          <Input
+            aria-label="Collection opens on"
+            label="Opens on"
+            type="date"
+            value={(component.collect_from ?? '').slice(0, 10)}
+            onChange={(event) => onChange({ collect_from: event.target.value || null })}
+          />
+          <Input
+            aria-label="Collection closes on"
+            label="Closes on"
+            type="date"
+            value={(component.collect_until ?? '').slice(0, 10)}
+            onChange={(event) => onChange({ collect_until: event.target.value || null })}
+          />
+        </div>
+      )}
+
+      {mode !== 'always' && (
+        <p className="mt-1.5 text-[12px] text-muted">
+          Outside the window the family sees the amount but cannot pay it online. The office
+          can still take it at the counter.
+        </p>
+      )}
     </div>
   )
 }
