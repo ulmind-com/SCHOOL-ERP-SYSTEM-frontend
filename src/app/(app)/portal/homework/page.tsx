@@ -16,6 +16,7 @@ import { StatCard } from '@/components/ui/stat-card'
 import { Textarea } from '@/components/ui/input'
 import { TabSwitcher } from '@/components/resource/tab-switcher'
 import { ApiError, api } from '@/lib/api'
+import { useSession } from '@/lib/session'
 import { cn, titleCase } from '@/lib/utils'
 
 const TABS = ['To do', 'Submitted', 'All'] as const
@@ -30,6 +31,9 @@ const TABS = ['To do', 'Submitted', 'All'] as const
 export default function HomeworkPage() {
   const [tab, setTab] = useState<(typeof TABS)[number]>('To do')
   const [answering, setAnswering] = useState<any>(null)
+  // A parent follows the work; only the student hands it in, and the API says
+  // so too — showing them the button would only produce an error.
+  const isStudent = useSession((state) => state.user?.portal) === 'student' 
 
   const { data, isLoading } = useQuery({
     queryKey: ['my-homework'],
@@ -59,12 +63,15 @@ export default function HomeworkPage() {
   }
 
   return (
-    <Page title="Homework" subtitle="What has been set for your class">
+    <Page
+      title="Homework"
+      subtitle={isStudent ? 'What has been set for your class' : "Your children's work"}
+    >
       <div className="grid gap-4 sm:grid-cols-3">
         <StatCard
           tone={items.filter((i) => !done(i)).length ? 'butter' : 'mint'}
           icon="clipboard-list"
-          label="To do"
+          label={isStudent ? 'To do' : 'Outstanding'}
           value={String(items.filter((i) => !done(i)).length)}
           caption={overdue.length ? `${overdue.length} past the due date` : 'Nothing overdue'}
         />
@@ -102,9 +109,10 @@ export default function HomeworkPage() {
         <div className="space-y-3">
           {shown.map((item: any) => (
             <HomeworkCard
-              key={item.id}
+              key={`${item.student_id ?? ''}-${item.id}`}
               item={item}
               done={Boolean(done(item))}
+              canSubmit={isStudent}
               onAnswer={() => setAnswering(item)}
             />
           ))}
@@ -119,10 +127,12 @@ export default function HomeworkPage() {
 function HomeworkCard({
   item,
   done,
+  canSubmit,
   onAnswer,
 }: {
   item: any
   done: boolean
+  canSubmit: boolean
   onAnswer: () => void
 }) {
   const due = item.due_date ? parseISO(item.due_date) : null
@@ -133,7 +143,9 @@ function HomeworkCard({
     <Card className={cn(late && 'border border-danger/30')}>
       <CardHeader
         title={item.title}
-        subtitle={[item.subject_name, titleCase(item.type ?? '')].filter(Boolean).join(' · ')}
+        subtitle={[item.student_name, item.subject_name, titleCase(item.type ?? '')]
+          .filter(Boolean)
+          .join(' · ')}
         action={
           <div className="flex items-center gap-3">
             {item.my_status === 'graded' ? (
@@ -146,11 +158,13 @@ function HomeworkCard({
                 <CheckCircle2 className="h-3 w-3" aria-hidden />
                 {titleCase(item.my_status ?? 'submitted')}
               </Badge>
-            ) : (
+            ) : canSubmit ? (
               <Button size="sm" onClick={onAnswer}>
                 <Send className="h-3.5 w-3.5" aria-hidden />
                 Hand in
               </Button>
+            ) : (
+              <Badge tone="neutral">Not handed in</Badge>
             )}
           </div>
         }
