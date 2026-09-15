@@ -8,6 +8,7 @@ const PREFIX = '/api/v1'
 const ACCESS_KEY = 'scholarly.access'
 const REFRESH_KEY = 'scholarly.refresh'
 const TENANT_KEY = 'scholarly.tenant'
+const YEAR_KEY = 'scholarly.academic-year'
 const IMPERSONATION_KEY = 'scholarly.impersonating'
 
 export class ApiError extends Error {
@@ -36,6 +37,12 @@ export const tokens = {
   access: () => (typeof window === 'undefined' ? null : localStorage.getItem(ACCESS_KEY)),
   refresh: () => (typeof window === 'undefined' ? null : localStorage.getItem(REFRESH_KEY)),
   tenant: () => (typeof window === 'undefined' ? null : localStorage.getItem(TENANT_KEY)),
+  /** The academic year staff are reading. Unset means the current one. */
+  year: () => (typeof window === 'undefined' ? null : localStorage.getItem(YEAR_KEY)),
+  setYear(id: string | null) {
+    if (id) localStorage.setItem(YEAR_KEY, id)
+    else localStorage.removeItem(YEAR_KEY)
+  },
   set(pair: TokenPair, tenantSlug?: string | null) {
     localStorage.setItem(ACCESS_KEY, pair.access_token)
     localStorage.setItem(REFRESH_KEY, pair.refresh_token)
@@ -48,6 +55,7 @@ export const tokens = {
     localStorage.removeItem(ACCESS_KEY)
     localStorage.removeItem(REFRESH_KEY)
     localStorage.removeItem(TENANT_KEY)
+    localStorage.removeItem(YEAR_KEY)
     localStorage.removeItem(IMPERSONATION_KEY)
   },
 
@@ -159,6 +167,10 @@ async function request<T>(path: string, options: RequestOptions = {}, retry = tr
     if (access) finalHeaders.set('Authorization', `Bearer ${access}`)
     const tenant = tokens.tenant()
     if (tenant) finalHeaders.set('X-Tenant', tenant)
+    // The server validates this against the institution's own years and falls
+    // back to the current one, so a stale id here is harmless.
+    const year = tokens.year()
+    if (year) finalHeaders.set('X-Academic-Year', year)
   }
 
   const response = await fetch(buildUrl(path, query), {

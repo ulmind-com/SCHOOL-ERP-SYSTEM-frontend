@@ -39,6 +39,9 @@ export interface Institution {
   }
   usage: { students: number; staff: number; users: number }
   current_academic_year?: { id: string; name: string } | null
+  academic_years?: AcademicYearOption[]
+  active_academic_year_id?: string | null
+  can_switch_academic_year?: boolean
   onboarding_completed: boolean
 }
 
@@ -94,4 +97,14 @@ export interface InstitutionChoice {
   name: string
   logo_url?: string
   institution_type: string
+}
+
+
+export interface AcademicYearOption {
+  id: string
+  name: string
+  is_current: boolean
+  status: string
+  start_date: string | null
+  end_date: string | null
 }

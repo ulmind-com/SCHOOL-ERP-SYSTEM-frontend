@@ -687,6 +687,7 @@ export const ASSIGNMENTS: ResourceDef = {
           <Badge tone="neutral">Portal</Badge>
         ),
     },
+    { key: 'set_by', header: 'Set by', cell: (r) => r.set_by || '—' },
     { key: 'due_date', header: 'Due', sortable: true, cell: (r) => date(r.due_date) },
     { key: 'max_marks', header: 'Marks', align: 'right', cell: (r) => r.max_marks || '—' },
     {

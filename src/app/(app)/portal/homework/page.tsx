@@ -144,7 +144,13 @@ function HomeworkCard({
     <Card className={cn(late && 'border border-danger/30')}>
       <CardHeader
         title={item.title}
-        subtitle={[item.student_name, item.subject_name, titleCase(item.type ?? '')]
+        subtitle={[
+          item.student_name,
+          item.subject_name,
+          titleCase(item.type ?? ''),
+          // Whose homework this is matters as much as which subject.
+          item.set_by ? `Set by ${item.set_by}` : '',
+        ]
           .filter(Boolean)
           .join(' · ')}
         action={

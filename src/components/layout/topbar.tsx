@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { useState } from 'react'
 import { Bell, ChevronDown, Menu, Search } from 'lucide-react'
 import { Avatar } from '@/components/ui/avatar'
+import { YearSwitcher } from './year-switcher'
 import { Badge } from '@/components/ui/badge'
 import { useSession } from '@/lib/session'
 import { cn, titleCase } from '@/lib/utils'
@@ -77,6 +78,8 @@ export function Topbar({
       )}
 
       <div className="flex shrink-0 items-center gap-3">
+        <YearSwitcher />
+
         <button
           type="button"
           aria-label="Notifications"

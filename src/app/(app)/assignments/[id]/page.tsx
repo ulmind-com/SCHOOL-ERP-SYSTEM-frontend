@@ -38,6 +38,7 @@ interface Row {
 interface Sheet {
   assignment: any
   submission_mode: 'online' | 'offline'
+  set_by: string
   expected: number
   submitted: number
   graded: number
@@ -150,6 +151,7 @@ export default function AssignmentPage() {
       title={work.title ?? 'Assignment'}
       subtitle={[
         titleCase(work.type ?? ''),
+        data.set_by ? `Set by ${data.set_by}` : '',
         due ? `Due ${format(due, 'd MMM yyyy')}` : 'No due date',
         offline ? 'Collected in class' : 'Handed in through the portal',
       ]
