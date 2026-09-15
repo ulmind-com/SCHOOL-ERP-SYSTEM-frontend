@@ -3,7 +3,7 @@
 import { useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { differenceInCalendarDays, format, parseISO } from 'date-fns'
-import { CheckCircle2, Clock, Send } from 'lucide-react'
+import { CheckCircle2, Clock, Hand, Send } from 'lucide-react'
 import { toast } from 'sonner'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -138,6 +138,7 @@ function HomeworkCard({
   const due = item.due_date ? parseISO(item.due_date) : null
   const days = due ? differenceInCalendarDays(due, new Date()) : null
   const late = days !== null && days < 0 && !done
+  const offline = item.submission_mode === 'offline'
 
   return (
     <Card className={cn(late && 'border border-danger/30')}>
@@ -156,7 +157,16 @@ function HomeworkCard({
             ) : done ? (
               <Badge tone="success">
                 <CheckCircle2 className="h-3 w-3" aria-hidden />
-                {titleCase(item.my_status ?? 'submitted')}
+                {item.collected_offline
+                  ? 'Teacher has it'
+                  : titleCase(item.my_status ?? 'submitted')}
+              </Badge>
+            ) : offline ? (
+              // No button, because there is nothing this screen can do — the
+              // work goes to the teacher, who ticks it off at their end.
+              <Badge tone="warning">
+                <Hand className="h-3 w-3" aria-hidden />
+                Hand to your teacher
               </Badge>
             ) : canSubmit ? (
               <Button size="sm" onClick={onAnswer}>
@@ -186,6 +196,12 @@ function HomeworkCard({
                     ? 'today'
                     : `in ${days} day${days === 1 ? '' : 's'}`}
               </span>
+            </>
+          )}
+          {offline && !done && (
+            <>
+              <span aria-hidden>·</span>
+              <span className="font-semibold text-ink-soft">Collected in class</span>
             </>
           )}
           {item.allow_late_submission === false && !done && (

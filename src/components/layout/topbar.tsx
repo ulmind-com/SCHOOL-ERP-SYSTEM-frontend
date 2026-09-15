@@ -23,7 +23,7 @@ export function Topbar({
   const [menuOpen, setMenuOpen] = useState(false)
 
   return (
-    <header className="flex flex-wrap items-center gap-4 px-1 py-1">
+    <header className="flex flex-wrap items-center gap-x-4 gap-y-3 px-1 py-1">
       <button
         type="button"
         onClick={onMenu}
@@ -38,7 +38,13 @@ export function Topbar({
         {subtitle && <p className="truncate text-[13px] text-muted">{subtitle}</p>}
       </div>
 
-      <div className="order-last w-full lg:order-none lg:mx-auto lg:w-auto lg:max-w-[420px] lg:flex-1">
+      {/* Search and the page's own actions share the wrapped row on a phone, so
+          the title keeps enough width to be a word rather than "Cal…". On a
+          desktop they fall back into the single row they have always been in. */}
+      <div
+        className="order-last min-w-0 basis-[260px] grow lg:order-none lg:mx-auto
+                   lg:w-auto lg:max-w-[420px] lg:flex-1 lg:basis-auto"
+      >
         <div className="relative">
           <Search
             className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-muted"
@@ -62,9 +68,11 @@ export function Topbar({
         </div>
       </div>
 
-      <div className="flex shrink-0 items-center gap-3">
-        {actions}
+      {actions && (
+        <div className="order-last flex shrink-0 items-center gap-3 lg:order-none">{actions}</div>
+      )}
 
+      <div className="flex shrink-0 items-center gap-3">
         <button
           type="button"
           aria-label="Notifications"

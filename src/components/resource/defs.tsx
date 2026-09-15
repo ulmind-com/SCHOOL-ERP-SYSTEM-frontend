@@ -3,6 +3,7 @@
 import { format, parseISO } from 'date-fns'
 import { Avatar } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
+import { AssignmentActions } from '@/components/assignments/assignment-actions'
 import { SendCredentials } from '@/components/people/send-credentials'
 import { money, subjectLabel, titleCase } from '@/lib/utils'
 import type { ResourceDef } from './types'
@@ -676,6 +677,16 @@ export const ASSIGNMENTS: ResourceDef = {
   columns: [
     { key: 'title', header: 'Assignment', sortable: true, cell: (r) => strong(r.title) },
     { key: 'type', header: 'Type', cell: (r) => <Badge tone="neutral">{titleCase(r.type)}</Badge> },
+    {
+      key: 'submission_mode',
+      header: 'Handed in',
+      cell: (r) =>
+        r.submission_mode === 'offline' ? (
+          <Badge tone="warning">In class</Badge>
+        ) : (
+          <Badge tone="neutral">Portal</Badge>
+        ),
+    },
     { key: 'due_date', header: 'Due', sortable: true, cell: (r) => date(r.due_date) },
     { key: 'max_marks', header: 'Marks', align: 'right', cell: (r) => r.max_marks || '—' },
     {
@@ -711,16 +722,25 @@ export const ASSIGNMENTS: ResourceDef = {
     { name: 'due_date', label: 'Due date', type: 'date' },
     { name: 'max_marks', label: 'Maximum marks', type: 'number' },
     {
-      name: 'status',
-      label: 'Status',
+      name: 'submission_mode',
+      label: 'How is it handed in?',
       type: 'select',
-      defaultValue: 'draft',
-      options: ['draft', 'published', 'closed'].map((v) => ({ value: v, label: titleCase(v) })),
+      defaultValue: 'online',
+      options: [
+        { value: 'online', label: 'In the portal — students upload their answer' },
+        { value: 'offline', label: 'In class — you collect it and tick it off' },
+      ],
+      hint: 'Offline work still gets marks and shows on the report card.',
+      full: true,
     },
     { name: 'allow_late_submission', label: 'Allow late submission', type: 'checkbox', defaultValue: true },
     { name: 'description', label: 'Instructions', type: 'textarea' },
   ],
+  // Status is deliberately not a form field. Publishing is what tells the class
+  // the work exists, so it happens through the action that also notifies them,
+  // never through a dropdown that quietly skips it.
   formWidth: 'lg',
+  rowActions: (row: any) => <AssignmentActions row={row} />,
 }
 
 export const LIBRARY_ITEMS: ResourceDef = {
