@@ -263,6 +263,14 @@ export default function AttendancePage() {
           </div>
         </div>
 
+        {closed && !takeAnyway && students.length > 0 && (
+          <p className="border-t border-line px-5 py-3.5 text-[13px] text-muted">
+            The register is closed for this day. Nothing here counts for or against anyone —
+            tick <span className="font-semibold text-ink">Take it anyway</span> above if a class
+            genuinely ran.
+          </p>
+        )}
+
         {students.length > 0 && (
           <div className="grid grid-cols-2 gap-3 border-y border-line bg-surface-sunken px-5 py-4 sm:grid-cols-6">
             <Tally label="Strength" value={students.length} />
@@ -357,7 +365,7 @@ export default function AttendancePage() {
           )}
         </CardBody>
 
-        {students.length > 0 && !locked && can('attendance:create') && (
+        {students.length > 0 && !locked && can('attendance:create') && (!closed || takeAnyway) && (
           <div className="flex items-center justify-between gap-3 border-t border-line px-5 py-4">
             <p className="text-[13px] text-muted">
               {tally.unmarked > 0
