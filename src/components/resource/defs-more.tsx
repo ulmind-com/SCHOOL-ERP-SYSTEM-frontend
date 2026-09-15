@@ -627,3 +627,88 @@ export const APPRAISALS: ResourceDef = {
     { name: 'improvements', label: 'Areas to improve', type: 'textarea' },
   ],
 }
+
+/* ── Holidays ──────────────────────────────────────────────────────────── */
+const HOLIDAY_TYPES = ['public', 'festival', 'vacation', 'exam_break', 'other']
+
+export const HOLIDAYS: ResourceDef = {
+  path: '/holidays',
+  module: 'academic_years',
+  title: 'Holidays',
+  subtitle: 'Days the institution is closed — and the ones it celebrates on site',
+  singular: 'Holiday',
+  plural: 'Holidays',
+  icon: 'calendar-off',
+  defaultSort: 'start_date',
+  defaultSortDir: 'asc',
+  createLabel: 'Add a holiday',
+  invalidates: ['options', 'register', 'student-profile', 'portal-me'],
+  filters: [
+    { name: 'type', label: 'Type', options: opts(HOLIDAY_TYPES) },
+    {
+      name: 'academic_year_id',
+      label: 'Academic year',
+      optionsFrom: '/academic-years',
+    },
+  ],
+  columns: [
+    { key: 'name', header: 'Holiday', sortable: true, cell: (r) => strong(r.name) },
+    {
+      key: 'start_date',
+      header: 'Dates',
+      sortable: true,
+      cell: (r) =>
+        r.end_date && r.end_date !== r.start_date
+          ? `${date(r.start_date)} – ${date(r.end_date)}`
+          : date(r.start_date),
+    },
+    {
+      key: 'type',
+      header: 'Type',
+      cell: (r) => <Badge tone="neutral">{titleCase(r.type ?? '')}</Badge>,
+    },
+    {
+      key: 'attendance_required',
+      header: 'Register',
+      align: 'center',
+      // The distinction the whole feature exists for, so it earns a column.
+      cell: (r) =>
+        r.attendance_required ? (
+          <Badge tone="warning">Taken</Badge>
+        ) : (
+          <Badge tone="neutral">Closed</Badge>
+        ),
+    },
+    {
+      key: 'is_active',
+      header: 'Status',
+      align: 'center',
+      cell: (r) => <Badge status={r.is_active === false ? 'inactive' : 'active'} />,
+    },
+  ],
+  fields: [
+    { name: 'name', label: 'Name', required: true, full: true, placeholder: 'Durga Puja' },
+    { name: 'start_date', label: 'From', type: 'date', required: true },
+    {
+      name: 'end_date',
+      label: 'To',
+      type: 'date',
+      hint: 'Leave blank for a single day',
+    },
+    { name: 'type', label: 'Type', type: 'select', defaultValue: 'public', options: opts(HOLIDAY_TYPES) },
+    {
+      name: 'academic_year_id',
+      label: 'Academic year',
+      type: 'remote-select',
+      optionsFrom: '/academic-years',
+    },
+    {
+      name: 'attendance_required',
+      label: 'Attendance is still taken',
+      type: 'checkbox',
+      hint: 'For a day celebrated at school — sports day, Independence Day. Off means the register is closed and the day does not count against anyone.',
+      full: true,
+    },
+    { name: 'description', label: 'Note', type: 'textarea', full: true },
+  ],
+}

@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { format } from 'date-fns'
-import { CheckCheck, Lock, Save, Users } from 'lucide-react'
+import { CalendarOff, CheckCheck, Lock, Save, Users } from 'lucide-react'
 import { toast } from 'sonner'
 import { Avatar } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
@@ -15,7 +15,7 @@ import { Page } from '@/components/layout/page'
 import { useOptions } from '@/hooks/use-resource'
 import { ApiError, api } from '@/lib/api'
 import { useSession } from '@/lib/session'
-import { cn, percent } from '@/lib/utils'
+import { cn, percent, titleCase } from '@/lib/utils'
 
 type Status = 'present' | 'absent' | 'late' | 'leave' | 'half_day'
 
@@ -76,10 +76,16 @@ export default function AttendancePage() {
     }
     setMarks(initial)
     setBeforeBulk(null)
+    setTakeAnyway(false)
   }, [register.data])
 
   const students: RegisterStudent[] = register.data?.students ?? []
   const locked = Boolean(register.data?.is_locked)
+  const holiday = register.data?.holiday ?? null
+  // A holiday the school teaches through is a normal register with a note on
+  // it; one it is shut for is not a register at all.
+  const closed = Boolean(holiday && !holiday.attendance_required)
+  const [takeAnyway, setTakeAnyway] = useState(false)
 
   const tally = useMemo(() => {
     const counts = { present: 0, absent: 0, late: 0, leave: 0, half_day: 0, unmarked: 0 }
@@ -96,6 +102,7 @@ export default function AttendancePage() {
       api.post<any>('/attendance/register', {
         section_id: sectionId,
         date,
+        despite_holiday: takeAnyway,
         entries: students.map((student) => ({
           student_id: student.student_id,
           status: marks[student.student_id] ?? 'present',
@@ -137,7 +144,7 @@ export default function AttendancePage() {
           : 'Take and review daily registers'
       }
       actions={
-        can('attendance:create') && students.length > 0 && !locked ? (
+        can('attendance:create') && students.length > 0 && !locked && (!closed || takeAnyway) ? (
           <Button onClick={() => save.mutate()} loading={save.isPending}>
             <Save className="h-4 w-4" aria-hidden />
             Save register
@@ -145,6 +152,45 @@ export default function AttendancePage() {
         ) : undefined
       }
     >
+      {holiday && (
+        <Card className={closed ? 'border border-info/30' : 'border border-warning/30'}>
+          <CardBody className="flex flex-wrap items-start gap-3">
+            <CalendarOff
+              className={cn('mt-0.5 h-5 w-5 shrink-0', closed ? 'text-info' : 'text-warning')}
+              aria-hidden
+            />
+            <div className="min-w-[220px] flex-1">
+              <p className="text-[14px] font-bold text-ink">
+                {holiday.name}
+                <span className="ml-2 text-[12.5px] font-semibold text-muted">
+                  {titleCase(holiday.type ?? '')}
+                  {holiday.end_date && holiday.end_date !== holiday.start_date
+                    ? ` · ${fmtRange(holiday.start_date, holiday.end_date)}`
+                    : ''}
+                </span>
+              </p>
+              <p className="mt-0.5 text-[13px] text-muted">
+                {closed
+                  ? 'The institution is closed. No register is taken and the day counts against nobody.'
+                  : 'Celebrated at school — the register is taken as usual and it counts.'}
+                {holiday.description ? ` ${holiday.description}` : ''}
+              </p>
+            </div>
+            {closed && can('attendance:create') && (
+              <label className="flex cursor-pointer items-center gap-2.5 text-[13px] font-semibold text-ink-soft">
+                <input
+                  type="checkbox"
+                  checked={takeAnyway}
+                  onChange={(event) => setTakeAnyway(event.target.checked)}
+                  className="h-4 w-4 rounded border-line accent-[rgb(17_18_20)]"
+                />
+                Take it anyway — extra class
+              </label>
+            )}
+          </CardBody>
+        </Card>
+      )}
+
       <Card>
         <div className="flex flex-wrap items-end gap-3 px-5 py-4">
           <Select
@@ -196,7 +242,7 @@ export default function AttendancePage() {
                 Locked
               </Badge>
             )}
-            {!locked && students.length > 0 && (
+            {!locked && students.length > 0 && (!closed || takeAnyway) && (
               <>
                 <Button
                   variant={bulkApplied('present') ? 'secondary' : 'soft'}
@@ -344,4 +390,12 @@ function Tally({
       <p className={cn('tabular mt-0.5 text-[19px] font-extrabold text-ink', tone)}>{value}</p>
     </div>
   )
+}
+
+function fmtRange(from: string, to: string) {
+  try {
+    return `${format(new Date(from), 'd MMM')} – ${format(new Date(to), 'd MMM')}`
+  } catch {
+    return ''
+  }
 }

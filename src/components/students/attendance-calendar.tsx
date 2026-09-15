@@ -12,7 +12,9 @@ const TONES: { key: string; cell: string; label: string }[] = [
   { key: 'late', cell: 'bg-warning', label: 'Late' },
   { key: 'half_day', cell: 'bg-ink', label: 'Half day' },
   { key: 'leave', cell: 'bg-info', label: 'Leave' },
-  { key: 'holiday', cell: 'bg-line', label: 'Holiday' },
+  // A holiday is neither attended nor missed, so it gets a colour of its own —
+  // distinct from "not marked", which is a day nobody got round to.
+  { key: 'holiday', cell: 'bg-lilac', label: 'Holiday' },
 ]
 const TONE_BY_KEY = new Map(TONES.map((t) => [t.key, t]))
 
@@ -90,7 +92,11 @@ export function AttendanceCalendar({ days, maxWeeks = 53 }: { days: Day[]; maxWe
 
   const present =
     (counts.get('present') ?? 0) + (counts.get('late') ?? 0) + (counts.get('half_day') ?? 0)
-  const rate = marked ? Math.round((present / marked) * 100) : 0
+  // Holidays are drawn but not counted — the same rule the percentage on the
+  // record follows, so the two never disagree.
+  const holidays = counts.get('holiday') ?? 0
+  const teachingDays = marked - holidays - (counts.get('excused') ?? 0)
+  const rate = teachingDays > 0 ? Math.round((present / teachingDays) * 100) : 0
 
   return (
     <div className="space-y-4">
@@ -136,6 +142,13 @@ export function AttendanceCalendar({ days, maxWeeks = 53 }: { days: Day[]; maxWe
                             }${day.remark ? ` · ${day.remark}` : ''}`
                           : undefined
                       }
+                      aria-label={
+                        day
+                          ? `${format(parseISO(day.date), 'd MMMM yyyy')}: ${
+                              tone?.label ?? 'not marked'
+                            }`
+                          : undefined
+                      }
                       style={{ width: CELL, height: CELL }}
                       className={cn(
                         'rounded-[4px]',
@@ -153,7 +166,7 @@ export function AttendanceCalendar({ days, maxWeeks = 53 }: { days: Day[]; maxWe
 
       <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
         <span className="text-[13px] font-bold text-ink">
-          {present} of {marked} day{marked === 1 ? '' : 's'} attended
+          {present} of {teachingDays} day{teachingDays === 1 ? '' : 's'} attended
           <span className="ml-1.5 font-semibold text-muted">({rate}%)</span>
         </span>
         {TONES.filter((tone) => counts.get(tone.key)).map((tone) => (
@@ -167,6 +180,11 @@ export function AttendanceCalendar({ days, maxWeeks = 53 }: { days: Day[]; maxWe
           <span className="h-[11px] w-[11px] rounded-[3px] bg-surface-sunken" aria-hidden />
           Not marked
         </span>
+        {holidays > 0 && (
+          <span className="text-[12px] text-muted">
+            Holidays are shown but not counted
+          </span>
+        )}
       </div>
     </div>
   )
