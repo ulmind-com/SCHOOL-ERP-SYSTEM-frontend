@@ -84,14 +84,22 @@ export function UpcomingHolidays({ panel, manage }: { panel?: Panel; manage?: bo
         title="Coming up"
         subtitle="Holidays in the next four months"
         action={
-          manage ? (
+          <span className="flex items-center gap-3">
             <Link
-              href="/academics/holidays"
+              href="/calendar"
               className="text-[13px] font-semibold text-ink-soft underline-offset-4 hover:underline"
             >
-              Manage
+              Full calendar
             </Link>
-          ) : undefined
+            {manage && (
+              <Link
+                href="/academics/holidays"
+                className="text-[13px] font-semibold text-ink-soft underline-offset-4 hover:underline"
+              >
+                Manage
+              </Link>
+            )}
+          </span>
         }
       />
       <CardBody className="pt-2">
