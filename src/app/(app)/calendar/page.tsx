@@ -1,7 +1,7 @@
-"use client";
+'use client'
 
-import { useMemo, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useMemo, useState } from 'react'
+import { useQuery } from '@tanstack/react-query'
 import {
   addMonths,
   differenceInCalendarDays,
@@ -11,7 +11,7 @@ import {
   parseISO,
   startOfMonth,
   subMonths,
-} from "date-fns";
+} from 'date-fns'
 import {
   CalendarDays,
   CalendarOff,
@@ -20,29 +20,30 @@ import {
   Clock,
   MapPin,
   PartyPopper,
-} from "lucide-react";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Card, CardBody, CardHeader } from "@/components/ui/card";
-import { EmptyState } from "@/components/ui/empty";
-import { Loader } from "@/components/ui/loader";
-import { Page } from "@/components/layout/page";
+} from 'lucide-react'
+import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
+import { Card, CardBody, CardHeader } from '@/components/ui/card'
+import { EmptyState } from '@/components/ui/empty'
+import { Loader } from '@/components/ui/loader'
+import { Page } from '@/components/layout/page'
 import {
   CalendarLegend,
   MonthGrid,
   eventsOn,
+  gridDays,
   holidaysOn,
   type CalendarEvent,
   type CalendarHoliday,
-} from "@/components/calendar/month-grid";
-import { api } from "@/lib/api";
-import { titleCase } from "@/lib/utils";
+} from '@/components/calendar/month-grid'
+import { api } from '@/lib/api'
+import { titleCase } from '@/lib/utils'
 
 interface CalendarData {
-  from: string;
-  to: string;
-  holidays: CalendarHoliday[];
-  events: CalendarEvent[];
+  from: string
+  to: string
+  holidays: CalendarHoliday[]
+  events: CalendarEvent[]
 }
 
 /**
@@ -53,50 +54,56 @@ interface CalendarData {
  * only sees the holidays that apply to their child's class.
  */
 export default function CalendarPage() {
-  const [month, setMonth] = useState(() => startOfMonth(new Date()));
-  const [selected, setSelected] = useState<Date | null>(() => new Date());
+  const [month, setMonth] = useState(() => startOfMonth(new Date()))
+  const [selected, setSelected] = useState<Date | null>(() => new Date())
 
   // One wide fetch, then navigate in the browser. A year planner is a few
   // hundred rows at most, and paging it by month makes every arrow click blink.
-  const from = useMemo(() => startOfMonth(subMonths(new Date(), 8)), []);
-  const to = useMemo(() => addMonths(from, 26), [from]);
+  const from = useMemo(() => startOfMonth(subMonths(new Date(), 8)), [])
+  const to = useMemo(() => addMonths(from, 26), [from])
 
   const query = useQuery({
-    queryKey: ["calendar", format(from, "yyyy-MM-dd")],
+    queryKey: ['calendar', format(from, 'yyyy-MM-dd')],
     queryFn: () =>
-      api.get<CalendarData>("/portal/calendar", {
-        start: format(from, "yyyy-MM-dd"),
-        end: format(to, "yyyy-MM-dd"),
+      api.get<CalendarData>('/portal/calendar', {
+        start: format(from, 'yyyy-MM-dd'),
+        end: format(to, 'yyyy-MM-dd'),
       }),
-  });
+  })
 
-  const holidays = query.data?.holidays ?? [];
-  const events = query.data?.events ?? [];
+  const holidays = query.data?.holidays ?? []
+  const events = query.data?.events ?? []
 
-  const thisMonthsHolidays = holidays.filter((holiday) => {
-    const start = parseISO(holiday.start_date);
-    const end = parseISO(holiday.end_date);
-    return start <= addMonths(month, 1) && end >= month;
-  });
+  // The list beside the grid should name exactly what the grid is showing,
+  // trailing days of the next month included — otherwise a holiday is visible
+  // in one and missing from the other.
+  const shown = useMemo(() => {
+    const days = gridDays(month)
+    const first = days[0]
+    const last = days[days.length - 1]
+    return holidays.filter(
+      (holiday) =>
+        parseISO(holiday.start_date) <= last && parseISO(holiday.end_date) >= first,
+    )
+  }, [holidays, month])
 
   const closedDays = useMemo(() => {
-    let count = 0;
-    const cursor = new Date(month);
+    let count = 0
+    const cursor = new Date(month)
     while (isSameMonth(cursor, month)) {
-      const covering = holidaysOn(holidays, cursor);
-      if (covering.length && !covering.every((h) => h.attendance_required))
-        count += 1;
-      cursor.setDate(cursor.getDate() + 1);
+      const covering = holidaysOn(holidays, cursor)
+      if (covering.length && !covering.every((h) => h.attendance_required)) count += 1
+      cursor.setDate(cursor.getDate() + 1)
     }
-    return count;
-  }, [holidays, month]);
+    return count
+  }, [holidays, month])
 
   if (query.isLoading) {
     return (
       <Page title="Calendar">
         <Loader message="Laying out the year…" />
       </Page>
-    );
+    )
   }
 
   return (
@@ -108,8 +115,8 @@ export default function CalendarPage() {
           variant="secondary"
           size="sm"
           onClick={() => {
-            setMonth(startOfMonth(new Date()));
-            setSelected(new Date());
+            setMonth(startOfMonth(new Date()))
+            setSelected(new Date())
           }}
         >
           Today
@@ -129,7 +136,7 @@ export default function CalendarPage() {
                 <ChevronLeft className="h-4 w-4" aria-hidden />
               </Button>
               <h2 className="min-w-[152px] text-center text-[17px] font-bold text-ink">
-                {format(month, "MMMM yyyy")}
+                {format(month, 'MMMM yyyy')}
               </h2>
               <Button
                 variant="ghost"
@@ -142,8 +149,8 @@ export default function CalendarPage() {
             </div>
             <p className="text-[12.5px] text-muted">
               {closedDays > 0
-                ? `${closedDays} day${closedDays === 1 ? "" : "s"} closed this month`
-                : "No closures this month"}
+                ? `${closedDays} day${closedDays === 1 ? '' : 's'} closed this month`
+                : 'No closures this month'}
             </p>
           </div>
 
@@ -153,7 +160,10 @@ export default function CalendarPage() {
               holidays={holidays}
               events={events}
               selected={selected}
-              onSelect={setSelected}
+              onSelect={(day) => {
+                setSelected(day)
+                if (!isSameMonth(day, month)) setMonth(startOfMonth(day))
+              }}
             />
             <CalendarLegend className="pt-4" />
           </CardBody>
@@ -161,11 +171,11 @@ export default function CalendarPage() {
 
         <div className="space-y-5">
           <DayDetail day={selected} holidays={holidays} events={events} />
-          <MonthHolidays month={month} holidays={thisMonthsHolidays} />
+          <MonthHolidays month={month} holidays={shown} />
         </div>
       </div>
     </Page>
-  );
+  )
 }
 
 /** What the clicked square actually holds. */
@@ -174,30 +184,27 @@ function DayDetail({
   holidays,
   events,
 }: {
-  day: Date | null;
-  holidays: CalendarHoliday[];
-  events: CalendarEvent[];
+  day: Date | null
+  holidays: CalendarHoliday[]
+  events: CalendarEvent[]
 }) {
-  if (!day) return null;
+  if (!day) return null
 
-  const covering = holidaysOn(holidays, day);
-  const dayEvents = eventsOn(events, day);
-  const isToday = isSameDay(day, new Date());
+  const covering = holidaysOn(holidays, day)
+  const dayEvents = eventsOn(events, day)
+  const isToday = isSameDay(day, new Date())
 
   return (
     <Card>
       <CardHeader
-        title={format(day, "EEEE d MMMM")}
-        subtitle={isToday ? "Today" : format(day, "yyyy")}
+        title={format(day, 'EEEE d MMMM')}
+        subtitle={isToday ? 'Today' : format(day, 'yyyy')}
       />
       <CardBody className="space-y-3 pt-3">
         {covering.map((holiday) => (
           <div key={holiday.id} className="flex items-start gap-2.5">
             {holiday.attendance_required ? (
-              <PartyPopper
-                className="mt-0.5 h-4 w-4 shrink-0 text-warning"
-                aria-hidden
-              />
+              <PartyPopper className="mt-0.5 h-4 w-4 shrink-0 text-warning" aria-hidden />
             ) : (
               <CalendarOff
                 className="mt-0.5 h-4 w-4 shrink-0 text-ink-soft"
@@ -207,15 +214,13 @@ function DayDetail({
             <div className="min-w-0 flex-1">
               <p className="text-[14px] font-bold text-ink">{holiday.name}</p>
               <p className="mt-0.5 text-[12.5px] text-muted">
-                {titleCase(holiday.type)} ·{" "}
+                {titleCase(holiday.type)} ·{' '}
                 {holiday.attendance_required
-                  ? "the register is still taken"
-                  : "closed, no register"}
+                  ? 'the register is still taken'
+                  : 'closed, no register'}
               </p>
               {holiday.description && (
-                <p className="mt-1 text-[12.5px] text-ink-soft">
-                  {holiday.description}
-                </p>
+                <p className="mt-1 text-[12.5px] text-ink-soft">{holiday.description}</p>
               )}
             </div>
           </div>
@@ -223,18 +228,13 @@ function DayDetail({
 
         {dayEvents.map((event) => (
           <div key={event.id} className="flex items-start gap-2.5">
-            <CalendarDays
-              className="mt-0.5 h-4 w-4 shrink-0 text-ink-soft"
-              aria-hidden
-            />
+            <CalendarDays className="mt-0.5 h-4 w-4 shrink-0 text-ink-soft" aria-hidden />
             <div className="min-w-0 flex-1">
               <p className="text-[14px] font-bold text-ink">{event.title}</p>
               <p className="mt-0.5 flex flex-wrap items-center gap-x-3 text-[12.5px] text-muted">
                 <span className="inline-flex items-center gap-1">
                   <Clock className="h-3 w-3" aria-hidden />
-                  {event.all_day
-                    ? "All day"
-                    : format(parseISO(event.start_at), "h:mm a")}
+                  {event.all_day ? 'All day' : format(parseISO(event.start_at), 'h:mm a')}
                 </span>
                 {event.location && (
                   <span className="inline-flex items-center gap-1">
@@ -254,22 +254,19 @@ function DayDetail({
         )}
       </CardBody>
     </Card>
-  );
+  )
 }
 
 function MonthHolidays({
   month,
   holidays,
 }: {
-  month: Date;
-  holidays: CalendarHoliday[];
+  month: Date
+  holidays: CalendarHoliday[]
 }) {
   return (
     <Card>
-      <CardHeader
-        title="Holidays"
-        subtitle={`In and around ${format(month, "MMMM")}`}
-      />
+      <CardHeader title="Holidays" subtitle={`In and around ${format(month, 'MMMM')}`} />
       <CardBody className="pt-2">
         {holidays.length === 0 ? (
           <EmptyState
@@ -280,9 +277,9 @@ function MonthHolidays({
         ) : (
           <ul className="space-y-1.5">
             {holidays.map((holiday) => {
-              const start = parseISO(holiday.start_date);
-              const end = parseISO(holiday.end_date);
-              const days = differenceInCalendarDays(end, start) + 1;
+              const start = parseISO(holiday.start_date)
+              const end = parseISO(holiday.end_date)
+              const days = differenceInCalendarDays(end, start) + 1
               return (
                 <li
                   key={holiday.id}
@@ -294,19 +291,19 @@ function MonthHolidays({
                     </span>
                     <span className="block text-[12.5px] text-muted">
                       {days > 1
-                        ? `${format(start, "d MMM")} – ${format(end, "d MMM")} · ${days} days`
-                        : format(start, "EEEE d MMMM")}
+                        ? `${format(start, 'd MMM')} – ${format(end, 'd MMM')} · ${days} days`
+                        : format(start, 'EEEE d MMMM')}
                     </span>
                   </span>
                   {holiday.attendance_required && (
                     <Badge tone="warning">Register taken</Badge>
                   )}
                 </li>
-              );
+              )
             })}
           </ul>
         )}
       </CardBody>
     </Card>
-  );
+  )
 }
