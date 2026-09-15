@@ -326,6 +326,7 @@ function TeacherDashboard({ data, heading }: { data: any; heading: string }) {
           )}
         </CardBody>
       </Card>
+      <UpcomingHolidays panel={data.holidays} />
     </Page>
   )
 }
