@@ -34,7 +34,11 @@ export function Topbar({
       </button>
 
       <div className="min-w-0 flex-1 lg:flex-none">
-        <h1 className="truncate text-[22px] font-extrabold tracking-tight text-ink">{title}</h1>
+        {/* Two lines rather than an ellipsis: on a phone the heading is the
+            only place the thing being looked at is named. */}
+        <h1 className="line-clamp-2 text-[22px] font-extrabold tracking-tight text-ink">
+          {title}
+        </h1>
         {subtitle && <p className="truncate text-[13px] text-muted">{subtitle}</p>}
       </div>
 
