@@ -2,7 +2,7 @@
 
 import { format, parseISO } from 'date-fns'
 import { Badge } from '@/components/ui/badge'
-import { money, subjectLabel, titleCase } from '@/lib/utils'
+import { money, sectionLabel, subjectLabel, titleCase } from '@/lib/utils'
 import type { ResourceDef } from './types'
 
 const date = (value?: string | null) => {
@@ -711,4 +711,85 @@ export const HOLIDAYS: ResourceDef = {
     },
     { name: 'description', label: 'Note', type: 'textarea', full: true },
   ],
+}
+
+/**
+ * Who teaches what, to which section.
+ *
+ * The single fact the teacher portal rests on. A teacher with no row here sees
+ * an empty school — correctly, because they have not been given anything to
+ * teach — so this screen is the one the office fills in first each year.
+ */
+export const TEACHING: ResourceDef = {
+  path: '/subject-assignments',
+  module: 'subjects',
+  title: 'Teaching Allocation',
+  singular: 'Allocation',
+  plural: 'Allocations',
+  subtitle: 'Who takes which subject, in which section, this academic year',
+  icon: 'user-check',
+  defaultSort: 'created_at',
+  searchable: false,
+  filters: [
+    { name: 'staff_id', label: 'Teacher', optionsFrom: '/staff', optionLabel: (s: any) => s.full_name },
+    { name: 'section_id', label: 'Section', optionsFrom: '/sections', optionLabel: sectionLabel },
+  ],
+  columns: [
+    {
+      key: 'teacher_name',
+      header: 'Teacher',
+      cell: (r: any) => <span className="font-bold text-ink">{r.teacher_name || '—'}</span>,
+    },
+    { key: 'subject_name', header: 'Subject', cell: (r: any) => r.subject_name || '—' },
+    { key: 'section_name', header: 'Section', cell: (r: any) => r.section_name || '—' },
+    {
+      key: 'is_primary',
+      header: 'Role',
+      align: 'center',
+      cell: (r: any) =>
+        r.is_primary ? (
+          <Badge tone="success">Main teacher</Badge>
+        ) : (
+          <Badge tone="neutral">Support</Badge>
+        ),
+    },
+  ],
+  fields: [
+    {
+      name: 'staff_id',
+      label: 'Teacher',
+      type: 'remote-select',
+      optionsFrom: '/staff',
+      optionLabel: (s: any) => s.full_name,
+      required: true,
+    },
+    {
+      name: 'section_id',
+      label: 'Section',
+      type: 'remote-select',
+      optionsFrom: '/sections',
+      optionLabel: sectionLabel,
+      required: true,
+    },
+    {
+      name: 'subject_id',
+      label: 'Subject',
+      type: 'remote-select',
+      optionsFrom: '/subjects',
+      optionLabel: subjectLabel,
+      required: true,
+    },
+    {
+      name: 'is_primary',
+      label: 'Main teacher for this subject',
+      type: 'checkbox',
+      defaultValue: true,
+    },
+  ],
+  // The academic year is stamped by the server from whichever year the office
+  // is looking at, so it is deliberately not on the form.
+  emptyTitle: 'Nobody has been allocated yet',
+  emptyDescription:
+    'A teacher only sees the sections they take. Add an allocation and their portal fills in.',
+  invalidates: ['options'],
 }
