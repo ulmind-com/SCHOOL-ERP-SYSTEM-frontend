@@ -9,6 +9,11 @@ import { Donut, DonutLegend, type Slice } from '@/components/charts/donut'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardBody, CardHeader } from '@/components/ui/card'
 import { EmptyState } from '@/components/ui/empty'
+import {
+  HolidayToday,
+  HolidaysNeedingAttention,
+  UpcomingHolidays,
+} from '@/components/dashboard/holidays'
 import { Page } from '@/components/layout/page'
 import { StatCard } from '@/components/ui/stat-card'
 import { api } from '@/lib/api'
@@ -53,6 +58,7 @@ function AdminDashboard({ data, heading }: { data: any; heading: string }) {
   const { stats, limits } = data
   const fees = stats.fees
   const attendance = stats.attendance_today
+  const shut = attendance.holiday && attendance.counts === false
 
   const feeSlices: Slice[] = [
     { name: 'Collected', value: fees.collected, color: 'rgb(17 18 20)' },
@@ -61,6 +67,8 @@ function AdminDashboard({ data, heading }: { data: any; heading: string }) {
 
   return (
     <Page title={heading} subtitle={`${data.institution.name} · Student Management`}>
+      <HolidayToday panel={data.holidays} />
+      <HolidaysNeedingAttention panel={data.holidays} />
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
         <StatCard
           tone="butter"
@@ -75,14 +83,18 @@ function AdminDashboard({ data, heading }: { data: any; heading: string }) {
           href="/students"
         />
         <StatCard
-          tone="blush"
-          icon="check-square"
+          tone={shut ? 'lilac' : 'blush'}
+          icon={shut ? 'calendar-off' : 'check-square'}
           label="Attendance Rate"
-          value={percent(attendance.percentage, 0)}
+          // A percentage on a day nobody was expected is not a number anyone
+          // should read as one, so it is not shown as one.
+          value={shut ? '—' : percent(attendance.percentage, 0)}
           caption={
-            attendance.marked
-              ? `${attendance.present} present of ${attendance.marked} marked today`
-              : 'No register taken yet today'
+            shut
+              ? `Closed for ${attendance.holiday}`
+              : attendance.marked
+                ? `${attendance.present} present of ${attendance.marked} marked today`
+                : 'No register taken yet today'
           }
           href="/attendance"
         />
@@ -213,6 +225,8 @@ function AdminDashboard({ data, heading }: { data: any; heading: string }) {
             </CardBody>
           </Card>
 
+          <UpcomingHolidays panel={data.holidays} manage />
+
           <Card>
             <CardHeader
               title="Upcoming Events"
@@ -259,6 +273,7 @@ function TeacherDashboard({ data, heading }: { data: any; heading: string }) {
   const { stats } = data
   return (
     <Page title={heading} subtitle="Your classes today">
+      <HolidayToday panel={data.holidays} />
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
         <StatCard
           tone="butter"
@@ -319,6 +334,7 @@ function TeacherDashboard({ data, heading }: { data: any; heading: string }) {
 function StudentDashboard({ data, heading }: { data: any; heading: string }) {
   return (
     <Page title={heading} subtitle={`${data.student.name} · ${data.student.admission_number}`}>
+      <HolidayToday panel={data.holidays} />
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
         <StatCard
           tone="butter"
@@ -394,6 +410,7 @@ function StudentDashboard({ data, heading }: { data: any; heading: string }) {
           </CardBody>
         </Card>
       </div>
+      <UpcomingHolidays panel={data.holidays} />
     </Page>
   )
 }
@@ -402,6 +419,7 @@ function StudentDashboard({ data, heading }: { data: any; heading: string }) {
 function ParentDashboard({ data, heading }: { data: any; heading: string }) {
   return (
     <Page title={heading} subtitle={data.guardian.name}>
+      <HolidayToday panel={data.holidays} />
       {data.children?.length ? (
         <div className="grid gap-4 lg:grid-cols-2">
           {data.children.map((child: any) => (
@@ -440,6 +458,7 @@ function ParentDashboard({ data, heading }: { data: any; heading: string }) {
           />
         </Card>
       )}
+      <UpcomingHolidays panel={data.holidays} />
     </Page>
   )
 }
