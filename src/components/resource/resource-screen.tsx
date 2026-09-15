@@ -302,6 +302,10 @@ function FormField({
     return <RemoteSelect field={field} defaultValue={defaultValue} error={error} className={span} />
   }
 
+  if (field.type === 'remote-multiselect') {
+    return <RemoteMultiSelect field={field} defaultValue={defaultValue} className="sm:col-span-2" />
+  }
+
   if (field.type === 'select') {
     return (
       <Select
@@ -402,6 +406,62 @@ function RemoteSelect({
   )
 }
 
+/**
+ * A tick list rather than a native multi-select.
+ *
+ * Nobody discovers ctrl-click, and the thing being chosen here — which sections
+ * get this homework — is worth being able to read at a glance.
+ */
+function RemoteMultiSelect({
+  field,
+  defaultValue,
+  className,
+}: {
+  field: FieldDef
+  defaultValue?: any
+  className?: string
+}) {
+  const { data, isLoading } = useOptions(field.optionsFrom ?? '', field.optionsQuery)
+  const chosen = new Set((defaultValue ?? []).map(String))
+  const options = data ?? []
+
+  return (
+    <div className={className}>
+      <span className="mb-1.5 block text-[13px] font-semibold text-ink-soft">
+        {field.label}
+      </span>
+      {isLoading ? (
+        <p className="text-[13px] text-muted">Loading…</p>
+      ) : options.length === 0 ? (
+        <p className="text-[13px] text-muted">Nothing to choose from yet.</p>
+      ) : (
+        <div className="flex flex-wrap gap-2 rounded-field border border-line bg-surface p-2.5">
+          {options.map((option: any) => (
+            <label
+              key={option.id}
+              className="flex cursor-pointer items-center gap-2 rounded-pill bg-surface-sunken
+                         px-3 py-1.5 text-[13px] font-semibold text-ink-soft transition
+                         hover:bg-ink/[0.07] has-[:checked]:bg-ink has-[:checked]:text-white"
+            >
+              <input
+                type="checkbox"
+                name={field.name}
+                value={option.id}
+                defaultChecked={chosen.has(String(option.id))}
+                className="h-3.5 w-3.5 rounded-[4px] border-line accent-ink"
+              />
+              {field.optionLabel
+                ? field.optionLabel(option)
+                : (option.name ?? option.title ?? option.id)}
+            </label>
+          ))}
+        </div>
+      )}
+      {field.hint && <p className="mt-1.5 text-[12.5px] text-muted">{field.hint}</p>}
+    </div>
+  )
+}
+
 function FilterControl({
   filter,
   value,
@@ -463,6 +523,10 @@ function buildBody(fields: FieldDef[], form: FormData) {
     let value: any
     if (field.type === 'checkbox') {
       value = form.get(field.name) === 'on'
+    } else if (field.type === 'remote-multiselect') {
+      // Always send it, empty included — an empty list is a real answer
+      // ("everyone in the class"), not an omitted field.
+      value = form.getAll(field.name).map(String)
     } else {
       const raw = form.get(field.name)
       value = raw === null ? undefined : String(raw).trim()

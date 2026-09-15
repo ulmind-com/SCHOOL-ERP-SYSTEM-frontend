@@ -1,9 +1,9 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { differenceInCalendarDays, format, parseISO } from 'date-fns'
-import { CheckCircle2, Clock, Hand, Send } from 'lucide-react'
+import { CheckCircle2, Clock, Hand, Paperclip, Send } from 'lucide-react'
 import { toast } from 'sonner'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -224,18 +224,47 @@ function HomeworkCard({
 
 function SubmitDrawer({ item, onClose }: { item: any; onClose: () => void }) {
   const client = useQueryClient()
+  const [files, setFiles] = useState<any[]>([])
+  const [uploading, setUploading] = useState(false)
+
+  // A fresh drawer should not inherit the last assignment's attachments.
+  useEffect(() => {
+    if (!item) setFiles([])
+  }, [item])
 
   const submit = useMutation({
     mutationFn: (content: string) =>
-      api.post<any>('/homework/submit', { assignment_id: item.id, text_answer: content }),
+      api.post<any>('/homework/submit', {
+        assignment_id: item.id,
+        text_answer: content,
+        attachments: files,
+      }),
     onSuccess: (data) => {
       toast.success(data.detail ?? 'Handed in')
       void client.invalidateQueries({ queryKey: ['my-homework'] })
+      setFiles([])
       onClose()
     },
     onError: (error) =>
       toast.error(error instanceof ApiError ? error.message : 'Could not hand that in'),
   })
+
+  const attach = async (chosen: FileList | null) => {
+    if (!chosen?.length) return
+    setUploading(true)
+    try {
+      for (const file of Array.from(chosen)) {
+        const form = new FormData()
+        form.append('file', file)
+        const stored = await api.upload<any>('/homework/attachment', form)
+        setFiles((current) => [...current, stored])
+      }
+    } catch (error) {
+      toast.error(error instanceof ApiError ? error.message : 'That file would not upload')
+    } finally {
+      setUploading(false)
+    }
+  }
 
   return (
     <Drawer
@@ -248,16 +277,68 @@ function SubmitDrawer({ item, onClose }: { item: any; onClose: () => void }) {
         className="space-y-4"
         onSubmit={(event) => {
           event.preventDefault()
-          submit.mutate(String(new FormData(event.currentTarget).get('content') ?? ''))
+          const content = String(new FormData(event.currentTarget).get('content') ?? '')
+          if (!content.trim() && files.length === 0) {
+            toast.error('Write an answer or attach a file')
+            return
+          }
+          submit.mutate(content)
         }}
       >
         <Textarea
           name="content"
           label="Your answer"
-          required
-          rows={10}
+          rows={8}
           placeholder="Type your answer, or say where you have left the work."
         />
+
+        <div>
+          <span className="mb-1.5 block text-[13px] font-semibold text-ink-soft">
+            Attachments
+          </span>
+          {files.length > 0 && (
+            <ul className="mb-2 space-y-1.5">
+              {files.map((file, index) => (
+                <li
+                  key={file.file_id ?? index}
+                  className="flex items-center gap-2 rounded-field bg-surface-sunken px-3 py-2 text-[12.5px]"
+                >
+                  <Paperclip className="h-3.5 w-3.5 shrink-0 text-muted" aria-hidden />
+                  <span className="min-w-0 flex-1 truncate font-semibold text-ink">
+                    {file.name}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setFiles((current) => current.filter((_, i) => i !== index))}
+                    className="shrink-0 font-semibold text-muted hover:text-danger"
+                  >
+                    Remove
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+          <label
+            className={cn(
+              'flex cursor-pointer items-center justify-center gap-2 rounded-field border border-dashed',
+              'border-line px-4 py-3 text-[13px] font-semibold text-ink-soft transition hover:border-ink/30',
+              uploading && 'pointer-events-none opacity-60',
+            )}
+          >
+            <Paperclip className="h-4 w-4" aria-hidden />
+            {uploading ? 'Uploading…' : 'Add a photo or file'}
+            <input
+              type="file"
+              multiple
+              className="hidden"
+              onChange={(event) => {
+                void attach(event.target.files)
+                event.target.value = ''
+              }}
+            />
+          </label>
+        </div>
+
         <p className="text-[12.5px] text-muted">
           Your teacher sees this along with the time you handed it in.
         </p>
@@ -265,7 +346,7 @@ function SubmitDrawer({ item, onClose }: { item: any; onClose: () => void }) {
           <Button type="button" variant="ghost" onClick={onClose}>
             Cancel
           </Button>
-          <Button type="submit" loading={submit.isPending}>
+          <Button type="submit" loading={submit.isPending} disabled={uploading}>
             <Send className="h-4 w-4" aria-hidden />
             Hand in
           </Button>

@@ -5,7 +5,7 @@ import { Avatar } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
 import { AssignmentActions } from '@/components/assignments/assignment-actions'
 import { SendCredentials } from '@/components/people/send-credentials'
-import { money, subjectLabel, titleCase } from '@/lib/utils'
+import { money, sectionLabel, subjectLabel, titleCase } from '@/lib/utils'
 import type { ResourceDef } from './types'
 
 const date = (value?: string | null) => {
@@ -709,6 +709,14 @@ export const ASSIGNMENTS: ResourceDef = {
       optionLabel: subjectLabel,
     },
     { name: 'class_id', label: 'Class', type: 'remote-select', optionsFrom: '/classes' },
+    {
+      name: 'section_ids',
+      label: 'Sections',
+      type: 'remote-multiselect',
+      optionsFrom: '/sections',
+      optionLabel: sectionLabel,
+      hint: 'Leave every box clear to set it for the whole class.',
+    },
     {
       name: 'type',
       label: 'Type',

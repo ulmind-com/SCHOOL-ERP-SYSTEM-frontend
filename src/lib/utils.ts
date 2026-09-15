@@ -88,6 +88,11 @@ export function thumb(url: string | undefined | null, size = 96) {
  * called "Mathematics". The code is what tells them apart on paper, so it is
  * what tells them apart here.
  */
+/** "Class 7 · A" — a section's name alone is "A" in every class that has one. */
+export function sectionLabel(section: { name?: string; class_name?: string }): string {
+  return [section.class_name, section.name].filter(Boolean).join(' · ') || '—'
+}
+
 export function subjectLabel(subject: {
   name?: string
   code?: string

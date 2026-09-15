@@ -32,11 +32,6 @@ interface SessionState {
   moduleEnabled: (key: string) => boolean
 }
 
-const CORE_MODULES = new Set([
-  'dashboard', 'users', 'roles', 'settings', 'audit',
-  'academic_years', 'classes', 'subjects', 'students', 'staff', 'attendance',
-])
-
 export const useSession = create<SessionState>((set, get) => ({
   user: null,
   institution: null,
@@ -121,10 +116,17 @@ export const useSession = create<SessionState>((set, get) => ({
     return permissions.some((p) => get().can(p))
   },
 
+  /**
+   * Membership, nothing more.
+   *
+   * `enabled_modules` arrives already resolved — plan, licence and institution
+   * type folded in by the server, which is also what `require()` reads. The
+   * client used to re-derive it and got the dedicated case wrong: a school that
+   * owned its deployment was shown a college's Faculties.
+   */
   moduleEnabled(key) {
     const institution = get().institution
     if (!institution) return true
-    if (institution.deployment === 'dedicated') return true
-    return CORE_MODULES.has(key) || institution.enabled_modules.includes(key)
+    return institution.enabled_modules.includes(key)
   },
 }))

@@ -5,7 +5,7 @@ export interface FieldDef {
   label: string
   type?:
     | 'text' | 'number' | 'date' | 'email' | 'tel' | 'time'
-    | 'select' | 'remote-select' | 'textarea' | 'checkbox'
+    | 'select' | 'remote-select' | 'remote-multiselect' | 'textarea' | 'checkbox'
   options?: { value: string; label: string }[]
   /** API path whose items populate a dropdown, e.g. "/classes". */
   optionsFrom?: string
